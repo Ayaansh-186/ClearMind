@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { CaptureBar } from '@/components/CaptureBar'
+import { ChatPanel } from '@/components/ChatPanel'
 import { NoteCard } from '@/components/NoteCard'
 import { NoteDetail } from '@/components/NoteDetail'
 import { Sidebar, type ViewKey } from '@/components/Sidebar'
@@ -190,6 +191,7 @@ export default function Home() {
       </section>
 
       <NoteDetail note={selected} onClose={() => setSelected(null)} onArchive={archiveNote} onRestore={restoreNote} onUpdate={mergeNote} />
+      <ChatPanel userId={user.id} activeNote={selected} />
     </main>
   )
 }
