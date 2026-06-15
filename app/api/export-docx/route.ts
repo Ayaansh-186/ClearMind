@@ -200,7 +200,7 @@ export async function POST(request: Request) {
     })
 
     const buffer = await Packer.toBuffer(doc)
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="${(title || 'notes').replace(/[^a-z0-9]/gi, '_')}.docx"`,
