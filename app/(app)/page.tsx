@@ -1,0 +1,195 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Sparkles } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
+import { CaptureBar } from '@/components/CaptureBar'
+import { NoteCard } from '@/components/NoteCard'
+import { NoteDetail } from '@/components/NoteDetail'
+import { Sidebar, type ViewKey } from '@/components/Sidebar'
+import { clusters, type Note } from '@/lib/types'
+
+function getBrowserClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
+type UserState = { id: string; email?: string }
+
+export default function Home() {
+  const router = useRouter()
+  const [user, setUser] = useState<UserState | null>(null)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [allNotes, setAllNotes] = useState<Note[]>([]) // always keep all notes for counts
+  const [activeView, setActiveView] = useState<ViewKey>('surface')
+  const [selected, setSelected] = useState<Note | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Fetch ALL notes for counts, and filtered notes for current view
+  const fetchNotes = useCallback(async (view = activeView, userId?: string) => {
+    const uid = userId ?? user?.id
+    if (!uid) return
+
+    // Always fetch ALL notes (archived + non-archived) for sidebar counts
+    const allRes = await fetch(`/api/notes?user_id=${uid}&archived=all`)
+    if (allRes.ok) {
+      const all = await allRes.json() as Note[]
+      setAllNotes(all)
+    }
+
+    // Fetch filtered notes for current view
+    const params = new URLSearchParams({ user_id: uid })
+    if (view === 'archived') params.set('archived', 'true')
+    if (clusters.includes(view as never)) params.set('cluster', view)
+    // Don't filter surface by relevance anymore — show all notes in "what matters now"
+    // but sort by relevance so high-relevance notes appear first
+
+    const res = await fetch(`/api/notes?${params.toString()}`)
+    if (res.ok) {
+      let data = await res.json() as Note[]
+      if (view === 'recent') {
+        data = data.filter(n => Date.now() - new Date(n.created_at).getTime() < 7 * 24 * 60 * 60 * 1000)
+      }
+      if (view === 'archived') {
+        data = data.filter(n => n.is_archived)
+      } else {
+        data = data.filter(n => !n.is_archived)
+      }
+      setNotes(data)
+      setSelected(curr => curr ? data.find(n => n.id === curr.id) ?? curr : curr)
+    }
+
+    setLoading(false)
+  }, [activeView, user])
+
+  useEffect(() => {
+    const supabase = getBrowserClient()
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session?.user) { router.replace('/login'); return }
+      const u = { id: data.session.user.id, email: data.session.user.email }
+      setUser(u)
+      fetchNotes(activeView, u.id)
+    })
+  }, [router])
+
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(() => fetchNotes(), 3000)
+    return () => clearInterval(interval)
+  }, [fetchNotes, user])
+
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {
+      surface: allNotes.filter(n => !n.is_archived).length,
+      all: allNotes.filter(n => !n.is_archived).length,
+      recent: allNotes.filter(n => !n.is_archived && Date.now() - new Date(n.created_at).getTime() < 7 * 24 * 60 * 60 * 1000).length,
+      archived: allNotes.filter(n => n.is_archived).length,
+    }
+    for (const cluster of clusters) {
+      result[cluster] = allNotes.filter(n => n.cluster === cluster && !n.is_archived).length
+    }
+    return result
+  }, [allNotes])
+
+  function mergeNote(note: Note) {
+    setNotes(curr => {
+      const withoutTemp = curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
+      const exists = withoutTemp.some(n => n.id === note.id)
+      return exists ? withoutTemp.map(n => n.id === note.id ? note : n) : [note, ...withoutTemp]
+    })
+    setAllNotes(curr => {
+      const withoutTemp = curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
+      const exists = withoutTemp.some(n => n.id === note.id)
+      return exists ? withoutTemp.map(n => n.id === note.id ? note : n) : [note, ...withoutTemp]
+    })
+  }
+
+  async function archiveNote(id: string) {
+    const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      const updated = await res.json()
+      setNotes(curr => curr.filter(n => n.id !== id))
+      setAllNotes(curr => curr.map(n => n.id === id ? { ...n, is_archived: true, ...updated } : n))
+      setSelected(null)
+    }
+  }
+
+  async function restoreNote(id: string) {
+    const res = await fetch(`/api/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_archived: false })
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setAllNotes(curr => curr.map(n => n.id === id ? { ...n, is_archived: false, ...updated } : n))
+      setSelected(null)
+    }
+  }
+
+  async function signOut() {
+    await getBrowserClient().auth.signOut()
+    router.replace('/login')
+  }
+
+  const viewTitle: Record<string, string> = {
+    surface: 'What matters now', all: 'All notes', recent: 'Recent', archived: 'Archived',
+    work: 'Work', ideas: 'Ideas', personal: 'Personal', learning: 'Learning', health: 'Health'
+  }
+
+  if (!user) return (
+    <main className="grid min-h-screen place-items-center bg-white text-zinc-500 dark:bg-zinc-950">
+      Opening Clarity...
+    </main>
+  )
+
+  return (
+    <main className="min-h-screen bg-white text-zinc-950 md:pl-[260px] dark:bg-zinc-950 dark:text-zinc-50">
+      <Sidebar
+        activeView={activeView}
+        counts={counts}
+        email={user.email}
+        notes={allNotes}
+        now={Date.now()}
+        onChangeView={(view) => { setActiveView(view); fetchNotes(view) }}
+        onSignOut={signOut}
+      />
+      <section className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">{viewTitle[activeView] ?? activeView}</h1>
+              <p className="mt-1 text-sm text-zinc-500">Drop the messy version. Clarity will keep sorting.</p>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-5 py-6 pb-28 md:pb-6">
+          <div className="mx-auto max-w-5xl">
+            {loading ? (
+              <div className="grid min-h-80 place-items-center text-zinc-500">Loading notes...</div>
+            ) : notes.length === 0 ? (
+              <div className="grid min-h-80 place-items-center text-center text-zinc-500">
+                <div>
+                  <Sparkles className="mx-auto mb-3 h-7 w-7 text-zinc-400" />
+                  <p>Your mind is clear. Add your first thought below.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {notes.map(note => <NoteCard key={note.id} note={note} onOpen={setSelected} />)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <CaptureBar userId={user.id} onCreate={mergeNote} />
+      </section>
+
+      <NoteDetail note={selected} onClose={() => setSelected(null)} onArchive={archiveNote} onRestore={restoreNote} onUpdate={mergeNote} />
+    </main>
+  )
+}
