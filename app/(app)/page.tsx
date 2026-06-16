@@ -8,7 +8,9 @@ import { CaptureBar } from '@/components/CaptureBar'
 import { ChatPanel } from '@/components/ChatPanel'
 import { NoteCard } from '@/components/NoteCard'
 import { NoteDetail } from '@/components/NoteDetail'
+import { OnboardingModal } from '@/components/OnboardingModal'
 import { Sidebar, type ViewKey } from '@/components/Sidebar'
+import { useOnboarding } from '@/lib/useOnboarding'
 import { clusters, type Note } from '@/lib/types'
 
 function getBrowserClient() {
@@ -30,6 +32,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Onboarding: pass null until we've loaded notes (prevents flash)
+  const noteCount = loading ? null : allNotes.length
+  const { shouldShow: showOnboarding, complete: completeOnboarding, dismiss: dismissOnboarding } = useOnboarding(noteCount)
+
   // Fetch ALL notes for counts, and filtered notes for current view
   const fetchNotes = useCallback(async (view = activeView, userId?: string) => {
     const uid = userId ?? user?.id
@@ -46,8 +52,6 @@ export default function Home() {
     const params = new URLSearchParams({ user_id: uid })
     if (view === 'archived') params.set('archived', 'true')
     if (clusters.includes(view as never)) params.set('cluster', view)
-    // Don't filter surface by relevance anymore — show all notes in "what matters now"
-    // but sort by relevance so high-relevance notes appear first
 
     const res = await fetch(`/api/notes?${params.toString()}`)
     if (res.ok) {
@@ -109,6 +113,11 @@ export default function Home() {
     })
   }
 
+  function handleOnboardingComplete(note: Note) {
+    mergeNote(note)
+    completeOnboarding()
+  }
+
   async function archiveNote(id: string) {
     const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
     if (res.ok) {
@@ -146,8 +155,6 @@ export default function Home() {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return notes
 
-    // When searching, look across all non-archived notes regardless of the active view
-    // (unless the active view is "archived", in which case search within archived notes)
     const pool = activeView === 'archived' ? allNotes.filter(n => n.is_archived) : allNotes.filter(n => !n.is_archived)
 
     return pool.filter(n => {
@@ -223,6 +230,15 @@ export default function Home() {
 
       <NoteDetail note={selected} onClose={() => setSelected(null)} onArchive={archiveNote} onRestore={restoreNote} onUpdate={mergeNote} />
       <ChatPanel userId={user.id} activeNote={selected} />
+
+      {/* Onboarding modal — only shown to first-time users */}
+      {showOnboarding && (
+        <OnboardingModal
+          userId={user.id}
+          onComplete={handleOnboardingComplete}
+          onDismiss={dismissOnboarding}
+        />
+      )}
     </main>
   )
 }
