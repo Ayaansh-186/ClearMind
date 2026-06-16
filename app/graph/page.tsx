@@ -299,7 +299,7 @@ export default function GraphPage() {
       .join('g')
       .attr('cursor', 'pointer')
       .call(
-        d3.drag<SVGGElement, GraphNode>()
+        d3.drag()
           .on('start', (event: any, d: GraphNode) => {
             if (!event.active) simulation.alphaTarget(0.3).restart()
             d.fx = d.x; d.fy = d.y
