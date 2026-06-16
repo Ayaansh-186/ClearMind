@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { Camera, Loader2, SendHorizonal } from 'lucide-react'
 import type { Note } from '@/lib/types'
+import { VoiceButton } from '@/components/VoiceButton'
 
 type Props = { userId: string; onCreate: (note: Note) => void }
 
@@ -83,6 +84,7 @@ export function CaptureBar({ userId, onCreate }: Props) {
         )}
 
         <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2 shadow-sm transition-shadow focus-within:shadow-md dark:border-zinc-700 dark:bg-zinc-900">
+          {/* Image upload */}
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -93,6 +95,13 @@ export function CaptureBar({ userId, onCreate }: Props) {
             <Camera size={19} />
           </button>
 
+          {/* Voice recorder */}
+          <VoiceButton userId={userId} onCreate={onCreate} disabled={busy} />
+
+          {/* Divider */}
+          <span className="h-5 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+
+          {/* Text input */}
           <input
             value={text}
             onChange={e => setText(e.target.value)}
@@ -104,6 +113,7 @@ export function CaptureBar({ userId, onCreate }: Props) {
 
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => submitImage(e.target.files?.[0])} />
 
+          {/* Send */}
           <button
             type="button"
             onClick={submitText}
