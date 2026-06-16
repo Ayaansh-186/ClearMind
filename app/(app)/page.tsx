@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles } from 'lucide-react'
+import { Search, Sparkles, X } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { CaptureBar } from '@/components/CaptureBar'
 import { ChatPanel } from '@/components/ChatPanel'
@@ -28,6 +28,7 @@ export default function Home() {
   const [activeView, setActiveView] = useState<ViewKey>('surface')
   const [selected, setSelected] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Fetch ALL notes for counts, and filtered notes for current view
   const fetchNotes = useCallback(async (view = activeView, userId?: string) => {
@@ -141,6 +142,22 @@ export default function Home() {
     work: 'Work', ideas: 'Ideas', personal: 'Personal', learning: 'Learning', health: 'Health'
   }
 
+  const displayedNotes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return notes
+
+    // When searching, look across all non-archived notes regardless of the active view
+    // (unless the active view is "archived", in which case search within archived notes)
+    const pool = activeView === 'archived' ? allNotes.filter(n => n.is_archived) : allNotes.filter(n => !n.is_archived)
+
+    return pool.filter(n => {
+      const title = (n.title ?? '').toLowerCase()
+      const raw = n.raw_content.toLowerCase()
+      const formatted = (n.formatted_content ?? '').toLowerCase()
+      return title.includes(q) || raw.includes(q) || formatted.includes(q)
+    })
+  }, [searchQuery, notes, allNotes, activeView])
+
   if (!user) return (
     <main className="grid min-h-screen place-items-center bg-white text-zinc-500 dark:bg-zinc-950">
       Opening Clarity...
@@ -160,10 +177,24 @@ export default function Home() {
       />
       <section className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+          <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{viewTitle[activeView] ?? activeView}</h1>
               <p className="mt-1 text-sm text-zinc-500">Drop the messy version. Clarity will keep sorting.</p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search notes..."
+                className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-9 py-2 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:focus:border-zinc-600"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
+                  <X size={15} />
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -172,16 +203,16 @@ export default function Home() {
           <div className="mx-auto max-w-5xl">
             {loading ? (
               <div className="grid min-h-80 place-items-center text-zinc-500">Loading notes...</div>
-            ) : notes.length === 0 ? (
+            ) : displayedNotes.length === 0 ? (
               <div className="grid min-h-80 place-items-center text-center text-zinc-500">
                 <div>
                   <Sparkles className="mx-auto mb-3 h-7 w-7 text-zinc-400" />
-                  <p>Your mind is clear. Add your first thought below.</p>
+                  <p>{searchQuery ? `No notes match "${searchQuery}"` : 'Your mind is clear. Add your first thought below.'}</p>
                 </div>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {notes.map(note => <NoteCard key={note.id} note={note} onOpen={setSelected} />)}
+                {displayedNotes.map(note => <NoteCard key={note.id} note={note} onOpen={setSelected} />)}
               </div>
             )}
           </div>

@@ -2,8 +2,8 @@
 
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
-import { Archive, Globe, GlobeLock, Loader2, Network, Sparkles, X, Copy, Check, Link, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { Archive, Globe, GlobeLock, Loader2, Network, Sparkles, X, Copy, Check, Link, RotateCcw, Pencil, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { clusterColors, type Note } from '@/lib/types'
 
 type Props = {
@@ -62,6 +62,16 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
   const [shareUrl, setShareUrl] = useState('')
   const [copied, setCopied] = useState(false)
   const [isShared, setIsShared] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  useEffect(() => {
+    setEditing(false)
+    setSaveError('')
+  }, [note?.id])
 
   if (!note) return null
   const colors = note.cluster ? clusterColors[note.cluster] : null
@@ -115,12 +125,62 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function startEdit() {
+    setEditTitle(note!.title ?? '')
+    setEditContent(note!.raw_content)
+    setSaveError('')
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+    setSaveError('')
+  }
+
+  async function saveEdit() {
+    if (!editContent.trim()) {
+      setSaveError('Note content cannot be empty.')
+      return
+    }
+    setSaving(true)
+    setSaveError('')
+    try {
+      const res = await fetch(`/api/notes/${note!.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle, raw_content: editContent })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        onUpdate({ ...note!, ...updated })
+        setView('raw')
+        setEditing(false)
+      } else {
+        const body = await res.json().catch(() => null)
+        setSaveError(body?.error ?? 'Failed to save changes.')
+      }
+    } catch {
+      setSaveError('Failed to save changes. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[440px] border-l border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950 flex flex-col">
       {/* Header */}
       <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 p-4 shrink-0">
         <div className="min-w-0 pr-2">
-          <h2 className="truncate text-lg font-semibold">{note.title ?? 'Untitled note'}</h2>
+          {editing ? (
+            <input
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              placeholder="Untitled note"
+              className="w-full rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-lg font-semibold outline-none focus:border-zinc-400 dark:border-zinc-700 dark:focus:border-zinc-500"
+            />
+          ) : (
+            <h2 className="truncate text-lg font-semibold">{note.title ?? 'Untitled note'}</h2>
+          )}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             {colors && <span className="rounded-full px-2.5 py-1 text-xs font-medium capitalize" style={{ backgroundColor: colors.bg, color: colors.text }}>{note.cluster}</span>}
             <div className="flex items-center gap-0.5">
@@ -131,7 +191,14 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
             </div>
           </div>
         </div>
-        <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"><X size={19} /></button>
+        <div className="flex shrink-0 items-center gap-1">
+          {!editing && (
+            <button onClick={startEdit} className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900" aria-label="Edit note">
+              <Pencil size={16} />
+            </button>
+          )}
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"><X size={19} /></button>
+        </div>
       </div>
 
       {/* Body */}
@@ -166,36 +233,62 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
         </div>
 
         {/* View tabs */}
-        <div className="mb-5 flex rounded-md bg-zinc-100 p-1 dark:bg-zinc-900">
-          {(['raw', 'formatted', 'diagram'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className={`flex-1 rounded px-2 py-2 text-xs font-medium capitalize transition ${view === v ? 'bg-white shadow-sm dark:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
-              {v === 'diagram' ? '🗺 Diagram' : v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-        </div>
+        {!editing && (
+          <div className="mb-5 flex rounded-md bg-zinc-100 p-1 dark:bg-zinc-900">
+            {(['raw', 'formatted', 'diagram'] as const).map(v => (
+              <button key={v} onClick={() => setView(v)}
+                className={`flex-1 rounded px-2 py-2 text-xs font-medium capitalize transition ${view === v ? 'bg-white shadow-sm dark:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                {v === 'diagram' ? '🗺 Diagram' : v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {view === 'raw' && <p className="whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-300">{note.raw_content}</p>}
+        {editing && (
+          <div className="space-y-3">
+            <textarea
+              value={editContent}
+              onChange={e => setEditContent(e.target.value)}
+              rows={12}
+              autoFocus
+              className="w-full resize-y rounded-lg border border-zinc-200 bg-transparent p-3 text-sm leading-7 text-zinc-700 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:text-zinc-300 dark:focus:border-zinc-500"
+            />
+            {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+            <p className="text-xs text-zinc-400">Editing content will clear the AI-formatted version, since it may no longer match.</p>
+            <div className="flex gap-2">
+              <button onClick={saveEdit} disabled={saving}
+                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200">
+                {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+              </button>
+              <button onClick={cancelEdit} disabled={saving}
+                className="flex-1 rounded-md border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
-        {view === 'formatted' && note.formatted_content && (
+        {!editing && view === 'raw' && <p className="whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-300">{note.raw_content}</p>}
+
+        {!editing && view === 'formatted' && note.formatted_content && (
           <div className="text-sm leading-7 text-zinc-700 dark:text-zinc-300 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2 [&_h3]:font-medium [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_p]:mb-3 [&_strong]:font-semibold">
             <ReactMarkdown>{note.formatted_content}</ReactMarkdown>
           </div>
         )}
-        {view === 'formatted' && !note.formatted_content && (
+        {!editing && view === 'formatted' && !note.formatted_content && (
           <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-400">
             <Sparkles size={24} className="mb-3" />
             <p className="text-sm">Click "Format with AI" or "Enhance with Google" below</p>
           </div>
         )}
-        {view === 'diagram' && explaining && (
+        {!editing && view === 'diagram' && explaining && (
           <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-400">
             <Loader2 size={24} className="mb-3 animate-spin" /><p className="text-sm">Building diagram...</p>
           </div>
         )}
-        {view === 'diagram' && !explaining && diagError && <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">{diagError}</div>}
-        {view === 'diagram' && !explaining && diagram && <MindMap diagram={diagram} />}
-        {view === 'diagram' && !explaining && !diagram && !diagError && (
+        {!editing && view === 'diagram' && !explaining && diagError && <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">{diagError}</div>}
+        {!editing && view === 'diagram' && !explaining && diagram && <MindMap diagram={diagram} />}
+        {!editing && view === 'diagram' && !explaining && !diagram && !diagError && (
           <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-400">
             <Network size={24} className="mb-3" /><p className="text-sm">Click "Explain with Diagram" to visualize this note</p>
           </div>
@@ -203,6 +296,7 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
       </div>
 
       {/* Footer */}
+      {!editing && (
       <div className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 p-4 shrink-0">
         <button onClick={enhanceNote} disabled={enhancing} className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-60 hover:bg-emerald-700">
           {enhancing ? <Loader2 size={17} className="animate-spin" /> : <Globe size={17} />}
@@ -226,6 +320,7 @@ export function NoteDetail({ note, onClose, onArchive, onRestore, onUpdate }: Pr
           </button>
         )}
       </div>
+      )}
     </div>
   )
 }
