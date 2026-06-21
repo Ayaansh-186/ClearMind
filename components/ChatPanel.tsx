@@ -88,7 +88,7 @@ export function ChatPanel({ userId, activeNote }: Props) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:scale-105 hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+        className="fixed bottom-[calc(var(--mobile-nav-offset)_+_0.75rem)] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:scale-105 hover:bg-zinc-800 sm:bottom-6 sm:right-6 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
         aria-label="Open AI chat"
       >
         <MessageCircle size={24} />
@@ -97,7 +97,7 @@ export function ChatPanel({ userId, activeNote }: Props) {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex h-[32rem] w-96 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950 sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[32rem] sm:w-96 sm:rounded-2xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <div className="flex items-center gap-2">
@@ -182,7 +182,10 @@ export function ChatPanel({ userId, activeNote }: Props) {
       </div>
 
       {/* Input */}
-      <div className="flex items-end gap-2 border-t border-zinc-200 p-2 dark:border-zinc-800">
+      <div
+        className="flex items-end gap-2 border-t border-zinc-200 p-2 dark:border-zinc-800"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
         <textarea
           ref={inputRef}
           value={input}

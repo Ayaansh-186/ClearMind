@@ -398,7 +398,10 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
 
         {/* Footer */}
         {!editing && (
-          <div className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 p-4 shrink-0">
+          <div
+            className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 p-4 shrink-0"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
             <button onClick={enhanceNote} disabled={enhancing} className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-60 hover:bg-emerald-700">
               {enhancing ? <Loader2 size={17} className="animate-spin" /> : <Globe size={17} />}
               {enhancing ? 'Searching Google...' : 'Enhance with Google'}

@@ -230,7 +230,10 @@ export function VersionHistoryPanel({ note, userId, onClose, onRestore }: Props)
         </div>
 
         {/* Footer note */}
-        <div className="shrink-0 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+        <div
+          className="shrink-0 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        >
           <p className="text-[11px] leading-relaxed text-zinc-400">
             Restoring a version saves the current note as a new version first, so nothing is lost.
           </p>

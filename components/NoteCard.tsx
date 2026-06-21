@@ -49,7 +49,7 @@ export function NoteCard({ note, onOpen, onTogglePin }: Props) {
           className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full transition ${
             note.is_pinned
               ? 'text-amber-500 opacity-100'
-              : 'text-zinc-300 opacity-0 hover:text-zinc-500 group-hover:opacity-100 dark:text-zinc-700 dark:hover:text-zinc-400'
+              : 'text-zinc-300 opacity-60 hover:text-zinc-500 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:text-zinc-700 dark:hover:text-zinc-400'
           }`}
         >
           <Pin size={15} fill={note.is_pinned ? 'currentColor' : 'none'} className={note.is_pinned ? 'rotate-0' : '-rotate-45'} />

@@ -307,7 +307,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-6 pb-28 md:pb-6">
+        <div className="flex-1 overflow-y-auto px-5 py-6 pb-52 md:pb-6">
           <div className="mx-auto max-w-5xl">
             {loading ? (
               <div className="grid min-h-80 place-items-center text-zinc-500">Loading notes...</div>

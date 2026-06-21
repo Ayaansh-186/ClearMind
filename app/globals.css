@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Height to clear the fixed mobile bottom nav (+ home-indicator safe area).
+     Used to float the capture bar and AI chat button above it on phones. */
+  --mobile-nav-offset: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 @theme inline {

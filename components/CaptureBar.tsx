@@ -11,6 +11,7 @@ export function CaptureBar({ userId, onCreate }: Props) {
   const [text, setText] = useState('')
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [recording, setRecording] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function submitText() {
@@ -74,8 +75,13 @@ export function CaptureBar({ userId, onCreate }: Props) {
   }
 
   return (
-    <div className="sticky bottom-0 z-20 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
-      <div className="mx-auto max-w-5xl">
+    <div
+      className="fixed inset-x-0 bottom-[var(--mobile-nav-offset)] z-20 border-t border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:sticky md:inset-x-auto md:bottom-0"
+    >
+      <div
+        className="mx-auto max-w-5xl px-4 py-3"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
         {/* Status bar */}
         {status && (
           <div className="mb-2 flex items-center gap-2 px-1">
@@ -85,31 +91,31 @@ export function CaptureBar({ userId, onCreate }: Props) {
         )}
 
         <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2 shadow-sm transition-shadow focus-within:shadow-md dark:border-zinc-700 dark:bg-zinc-900">
-          {/* Image upload */}
+          {/* Image upload — collapses on phones while recording so the waveform has room */}
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 disabled:opacity-40"
+            className={`${recording ? 'hidden sm:flex' : 'flex'} h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 disabled:opacity-40`}
             aria-label="Upload image"
           >
             <Camera size={19} />
           </button>
 
           {/* Voice recorder */}
-          <VoiceButton userId={userId} onCreate={onCreate} disabled={busy} />
+          <VoiceButton userId={userId} onCreate={onCreate} disabled={busy} onRecordingChange={setRecording} />
 
           {/* Divider */}
           <span className="h-5 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
 
-          {/* Text input */}
+          {/* Text input — collapses on phones while recording so the waveform has room */}
           <input
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitText() } }}
             disabled={busy}
             placeholder="Dump any thought here — AI will sort it..."
-            className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
+            className={`min-w-0 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50 ${recording ? 'hidden sm:block' : ''}`}
           />
 
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => submitImage(e.target.files?.[0])} />
@@ -119,7 +125,7 @@ export function CaptureBar({ userId, onCreate }: Props) {
             type="button"
             onClick={submitText}
             disabled={busy || !text.trim()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950 text-white transition hover:bg-zinc-800 disabled:opacity-30 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+            className={`${recording ? 'hidden sm:flex' : 'flex'} h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950 text-white transition hover:bg-zinc-800 disabled:opacity-30 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200`}
             aria-label="Save note"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : <SendHorizonal size={17} />}

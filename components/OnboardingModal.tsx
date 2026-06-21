@@ -103,7 +103,7 @@ export function OnboardingModal({ userId, onComplete, onDismiss }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm p-4"
       onClick={handleBackdrop}
     >
-      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
 
         {/* Progress dots */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5">

@@ -10,11 +10,12 @@ type Props = {
   userId: string
   onCreate: (note: Note) => void
   disabled?: boolean
+  onRecordingChange?: (recording: boolean) => void
 }
 
 const MAX_DURATION_MS = 120_000 // 2 minutes
 
-export function VoiceButton({ userId, onCreate, disabled }: Props) {
+export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: Props) {
   const [state, setState] = useState<RecordingState>('idle')
   const [duration, setDuration] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export function VoiceButton({ userId, onCreate, disabled }: Props) {
     setState('recording')
     setDuration(0)
     chunksRef.current = []
+    onRecordingChange?.(true)
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -97,6 +99,7 @@ export function VoiceButton({ userId, onCreate, disabled }: Props) {
       console.error('Mic error:', err)
       setState('error')
       setErrorMsg('Microphone access denied.')
+      onRecordingChange?.(false)
       setTimeout(() => setState('idle'), 3000)
     }
   }
@@ -107,6 +110,7 @@ export function VoiceButton({ userId, onCreate, disabled }: Props) {
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null }
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }
     setBars(Array(12).fill(3))
+    onRecordingChange?.(false)
 
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
@@ -120,6 +124,7 @@ export function VoiceButton({ userId, onCreate, disabled }: Props) {
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null }
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }
     setBars(Array(12).fill(3))
+    onRecordingChange?.(false)
 
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
