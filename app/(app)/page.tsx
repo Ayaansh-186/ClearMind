@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Sparkles, X } from 'lucide-react'
+import { Pin, Search, Sparkles, X } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { CaptureBar } from '@/components/CaptureBar'
 import { ChatPanel } from '@/components/ChatPanel'
@@ -31,6 +31,7 @@ export default function Home() {
   const [selected, setSelected] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [pinPending, setPinPending] = useState<Set<string>>(new Set())
 
   // Onboarding: pass null until we've loaded notes (prevents flash)
   const noteCount = loading ? null : allNotes.length
@@ -118,6 +119,37 @@ export default function Home() {
     completeOnboarding()
   }
 
+  async function togglePin(note: Note) {
+    const nextPinned = !note.is_pinned
+
+    // Optimistic update
+    setPinPending(curr => new Set(curr).add(note.id))
+    setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
+    setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
+    setSelected(curr => curr?.id === note.id ? { ...curr, is_pinned: nextPinned } : curr)
+
+    try {
+      const res = await fetch(`/api/notes/${note.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_pinned: nextPinned }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        mergeNote(updated)
+      } else {
+        // Revert on failure
+        setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+        setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+      }
+    } catch {
+      setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+      setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+    } finally {
+      setPinPending(curr => { const next = new Set(curr); next.delete(note.id); return next })
+    }
+  }
+
   async function archiveNote(id: string) {
     const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
     if (res.ok) {
@@ -164,6 +196,12 @@ export default function Home() {
       return title.includes(q) || raw.includes(q) || formatted.includes(q)
     })
   }, [searchQuery, notes, allNotes, activeView])
+
+  // Split into pinned / unpinned. Pinned section is hidden in the archived view
+  // (archived notes shouldn't clutter a "pinned" shelf) and while searching.
+  const showPinnedSection = activeView !== 'archived' && !searchQuery.trim()
+  const pinnedNotes = showPinnedSection ? displayedNotes.filter(n => n.is_pinned) : []
+  const unpinnedNotes = showPinnedSection ? displayedNotes.filter(n => !n.is_pinned) : displayedNotes
 
   if (!user) return (
     <main className="grid min-h-screen place-items-center bg-white text-zinc-500 dark:bg-zinc-950">
@@ -218,9 +256,41 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {displayedNotes.map(note => <NoteCard key={note.id} note={note} onOpen={setSelected} />)}
-              </div>
+              <>
+                {/* Pinned section */}
+                {pinnedNotes.length > 0 && (
+                  <div className="mb-8">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Pin size={13} className="text-amber-500" fill="currentColor" />
+                      <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                        Pinned
+                      </h2>
+                      <span className="text-xs text-zinc-300 dark:text-zinc-700">· {pinnedNotes.length}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {pinnedNotes.map(note => (
+                        <NoteCard key={note.id} note={note} onOpen={setSelected} onTogglePin={togglePin} />
+                      ))}
+                    </div>
+                    {unpinnedNotes.length > 0 && (
+                      <div className="mt-8 mb-3 flex items-center gap-2">
+                        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                          {viewTitle[activeView] ?? 'Notes'}
+                        </h2>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Everything else */}
+                {unpinnedNotes.length > 0 && (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {unpinnedNotes.map(note => (
+                      <NoteCard key={note.id} note={note} onOpen={setSelected} onTogglePin={togglePin} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -228,7 +298,15 @@ export default function Home() {
         <CaptureBar userId={user.id} onCreate={mergeNote} />
       </section>
 
-      <NoteDetail note={selected} userId={user.id} onClose={() => setSelected(null)} onArchive={archiveNote} onRestore={restoreNote} onUpdate={mergeNote} />
+      <NoteDetail
+        note={selected}
+        userId={user.id}
+        onClose={() => setSelected(null)}
+        onArchive={archiveNote}
+        onRestore={restoreNote}
+        onUpdate={mergeNote}
+        onTogglePin={togglePin}
+      />
       <ChatPanel userId={user.id} activeNote={selected} />
 
       {/* Onboarding modal — only shown to first-time users */}

@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
-import { Archive, Globe, GlobeLock, Loader2, Network, Sparkles, X, Copy, Check, RotateCcw, Pencil, Save, Clock } from 'lucide-react'
+import { Archive, Globe, GlobeLock, Loader2, Network, Sparkles, X, Copy, Check, RotateCcw, Pencil, Save, Clock, Pin } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clusterColors, type Note } from '@/lib/types'
 import { VersionHistoryPanel } from '@/components/VersionHistoryPanel'
@@ -14,6 +14,7 @@ type Props = {
   onArchive: (id: string) => void
   onRestore: (id: string) => void
   onUpdate: (note: Note) => void
+  onTogglePin?: (note: Note) => void
 }
 
 type DiagramNode = { id: string; label: string; children?: string[] }
@@ -53,7 +54,7 @@ function MindMap({ diagram }: { diagram: Diagram }) {
   )
 }
 
-export function NoteDetail({ note, userId, onClose, onArchive, onRestore, onUpdate }: Props) {
+export function NoteDetail({ note, userId, onClose, onArchive, onRestore, onUpdate, onTogglePin }: Props) {
   const [view, setView] = useState<'raw' | 'formatted' | 'diagram'>('raw')
   const [formatting, setFormatting] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
@@ -215,6 +216,21 @@ export function NoteDetail({ note, userId, onClose, onArchive, onRestore, onUpda
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {/* Pin button */}
+            {!editing && onTogglePin && (
+              <button
+                onClick={() => onTogglePin(note)}
+                className={`flex h-9 w-9 items-center justify-center rounded-md transition ${
+                  note.is_pinned
+                    ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20'
+                    : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                }`}
+                aria-label={note.is_pinned ? 'Unpin note' : 'Pin note'}
+                title={note.is_pinned ? 'Unpin note' : 'Pin note'}
+              >
+                <Pin size={16} fill={note.is_pinned ? 'currentColor' : 'none'} />
+              </button>
+            )}
             {/* History button */}
             {!editing && (
               <button

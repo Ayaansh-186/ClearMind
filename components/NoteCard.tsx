@@ -1,8 +1,13 @@
 'use client'
 
+import { Pin } from 'lucide-react'
 import { clusterColors, type Note } from '@/lib/types'
 
-type Props = { note: Note; onOpen: (note: Note) => void }
+type Props = {
+  note: Note
+  onOpen: (note: Note) => void
+  onTogglePin?: (note: Note) => void
+}
 
 function relativeTime(value: string) {
   const diff = Date.now() - new Date(value).getTime()
@@ -13,17 +18,45 @@ function relativeTime(value: string) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-export function NoteCard({ note, onOpen }: Props) {
+export function NoteCard({ note, onOpen, onTogglePin }: Props) {
   const colors = note.cluster ? clusterColors[note.cluster] : null
   const isProcessing = !note.title
+
+  function handlePinClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    onTogglePin?.(note)
+  }
 
   return (
     <button
       onClick={() => onOpen(note)}
-      className="group flex min-h-[13rem] w-full flex-col rounded-xl border border-zinc-200 bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+      className={`group relative flex min-h-[13rem] w-full flex-col rounded-xl border p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+        note.is_pinned
+          ? 'border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/10'
+          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700'
+      }`}
     >
+      {/* Pin toggle */}
+      {onTogglePin && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={handlePinClick}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePinClick(e as unknown as React.MouseEvent) } }}
+          aria-label={note.is_pinned ? 'Unpin note' : 'Pin note'}
+          title={note.is_pinned ? 'Unpin note' : 'Pin note'}
+          className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full transition ${
+            note.is_pinned
+              ? 'text-amber-500 opacity-100'
+              : 'text-zinc-300 opacity-0 hover:text-zinc-500 group-hover:opacity-100 dark:text-zinc-700 dark:hover:text-zinc-400'
+          }`}
+        >
+          <Pin size={15} fill={note.is_pinned ? 'currentColor' : 'none'} className={note.is_pinned ? 'rotate-0' : '-rotate-45'} />
+        </span>
+      )}
+
       {/* Top row */}
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-4 flex items-center justify-between gap-2 pr-7">
         {colors ? (
           <span className="rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" style={{ backgroundColor: colors.bg, color: colors.text }}>
             {note.cluster}

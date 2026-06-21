@@ -34,6 +34,9 @@ export async function PATCH(
   if (typeof body.is_archived === 'boolean') {
     update.is_archived = body.is_archived
   }
+  if (typeof body.is_pinned === 'boolean') {
+    update.is_pinned = body.is_pinned
+  }
   if (typeof body.title === 'string') {
     update.title = body.title.trim().slice(0, 200) || null
   }
@@ -43,12 +46,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'raw_content cannot be empty' }, { status: 400 })
     }
     if (trimmed.length > 20000) {
-      return NextResponse.json({ error: 'raw_content is too long (max 20000 characters)' }, { status: 400 })
+      return NextResponse.json({ error: 'raw_content is too long (max 20 000 characters)' }, { status: 400 })
     }
     update.raw_content = trimmed
-    // Editing raw content invalidates any previously generated formatted version
     update.formatted_content = null
-    // Flag that we need to snapshot the current version before overwriting
     snapshotBeforeEdit = true
   }
 
@@ -56,7 +57,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
-  // ── Snapshot current content before overwriting ───────────────────────────
+  // ── Snapshot current content before a content edit ────────────────────────
   if (snapshotBeforeEdit) {
     const { data: current } = await supabase
       .from('notes')
@@ -65,16 +66,13 @@ export async function PATCH(
       .single()
 
     if (current?.raw_content && current.user_id) {
-      const label = body.version_label as string | undefined
-
       await supabase.from('note_versions').insert({
         note_id: id,
         user_id: current.user_id,
         raw_content: current.raw_content,
         title: current.title ?? null,
-        version_label: label ?? null,
+        version_label: body.version_label as string | undefined ?? null,
       })
-      // Non-fatal: if snapshot fails, the edit still proceeds
     }
   }
 

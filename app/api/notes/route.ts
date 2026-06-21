@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       user_id,
       relevance: 5,
       is_archived: false,
+      is_pinned: false,
     })
     .select('*')
     .single()
@@ -43,9 +44,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
 
-  const userId = searchParams.get('user_id')
+  const userId  = searchParams.get('user_id')
   const cluster = searchParams.get('cluster')
-  const view = searchParams.get('view')
+  const view    = searchParams.get('view')
   const archived = searchParams.get('archived')
 
   if (!userId) {
@@ -71,9 +72,11 @@ export async function GET(request: NextRequest) {
     query = query.gte('relevance', 7)
   }
 
+  // Pinned notes always sort first, then by relevance desc, then newest first
   const { data, error } = await query
-    .order('relevance', { ascending: false })
-    .order('created_at', { ascending: false })
+    .order('is_pinned',   { ascending: false })
+    .order('relevance',   { ascending: false })
+    .order('created_at',  { ascending: false })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
