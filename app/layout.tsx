@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     title: 'Clarity — Self-Organizing Notes',
     description: 'Capture messy thoughts and let AI sort, format, and cluster them automatically.',
   },
+  verification: {
+    google: 'Qo96PyK2oa9EqZfTJwp0TFAtwVQ_j45WQC96H4_KB2w',
+  },
   robots: {
     index: true,
     follow: true,
