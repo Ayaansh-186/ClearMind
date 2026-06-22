@@ -12,12 +12,15 @@ async function callGroq(prompt: string): Promise<string> {
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
-      max_tokens: 200,
+      max_tokens: 60,
     }),
   })
-  if (!res.ok) throw new Error('Groq error')
+  if (!res.ok) {
+    const txt = await res.text()
+    throw new Error(`Groq ${res.status}: ${txt}`)
+  }
   const data = await res.json()
-  return data.choices?.[0]?.message?.content?.trim() ?? '{}'
+  return data.choices?.[0]?.message?.content?.trim() ?? '[]'
 }
 
 export async function POST(request: NextRequest) {
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'note_id and user_id required' }, { status: 400 })
     }
 
-    // Fetch the source note
+    // Fetch source note
     const { data: source } = await supabase
       .from('notes')
       .select('id, title, raw_content, cluster')
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     if (!source) return NextResponse.json({ error: 'Note not found' }, { status: 404 })
 
-    // Fetch up to 60 other notes from the same user (exclude current, exclude archived)
+    // Fetch up to 50 other notes for this user
     const { data: candidates } = await supabase
       .from('notes')
       .select('id, title, raw_content, cluster, created_at')
@@ -44,55 +47,62 @@ export async function POST(request: NextRequest) {
       .eq('is_archived', false)
       .neq('id', note_id)
       .order('created_at', { ascending: false })
-      .limit(60)
+      .limit(50)
 
     if (!candidates || candidates.length === 0) {
       return NextResponse.json({ related: [] })
     }
 
-    // Build a compact candidate list for the model
+    // Use SHORT numeric indexes (not UUIDs) — much more reliable for the model to return
     const candidateList = candidates.map((n, i) =>
-      `[${i}] id=${n.id} | cluster=${n.cluster ?? 'unknown'} | title=${n.title ?? 'Untitled'} | preview=${(n.raw_content ?? '').slice(0, 120)}`
+      `${i}: [${n.cluster ?? '?'}] ${(n.title ?? 'Untitled').slice(0, 50)} — ${(n.raw_content ?? '').slice(0, 100)}`
     ).join('\n')
 
-    const prompt = `You are a knowledge assistant. Given a source note and a list of candidate notes, return the IDs of the 4 most semantically related candidates.
+    const prompt = `Given this note:
+"${(source.title ?? 'Untitled').slice(0, 60)}" — ${(source.raw_content ?? '').slice(0, 300)}
 
-SOURCE NOTE:
-Title: ${source.title ?? 'Untitled'}
-Cluster: ${source.cluster ?? 'unknown'}
-Content: ${(source.raw_content ?? '').slice(0, 400)}
+Pick the 4 most related notes from this list by their NUMBER. Return ONLY a JSON array of 4 numbers, like: [2, 7, 14, 23]
+No explanation, no text, just the array.
 
-CANDIDATES (format: [index] id=... | cluster=... | title=... | preview=...):
-${candidateList}
+${candidateList}`
 
-Return ONLY a valid JSON object like: {"ids": ["<id1>", "<id2>", "<id3>", "<id4>"]}
-Pick notes that share topics, themes, or concepts with the source. No explanation, no markdown, just JSON.`
-
-    let raw = '{}'
+    let raw = '[]'
     try {
       raw = await callGroq(prompt)
-    } catch {
+    } catch (e) {
+      console.error('Groq error in related notes:', e)
       return NextResponse.json({ related: [] })
     }
-    let relatedIds: string[] = []
+
+    // Parse the index array
+    let indexes: number[] = []
     try {
-      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
-      relatedIds = (parsed.ids ?? []).filter((id: unknown) =>
-        typeof id === 'string' && candidates.some(c => c.id === id)
-      ).slice(0, 4)
+      // Strip any markdown fences or extra text, grab the first [...] array
+      const match = raw.match(/\[[\d,\s]+\]/)
+      if (!match) return NextResponse.json({ related: [] })
+      indexes = JSON.parse(match[0])
+        .filter((n: unknown) => typeof n === 'number' && n >= 0 && n < candidates.length)
+        .slice(0, 4)
     } catch {
       return NextResponse.json({ related: [] })
     }
 
-    // Fetch full note data for the related IDs (with tags)
-    if (relatedIds.length === 0) return NextResponse.json({ related: [] })
+    if (indexes.length === 0) return NextResponse.json({ related: [] })
+
+    // Map indexes back to IDs
+    const relatedIds = indexes.map(i => candidates[i].id)
 
     const { data: related } = await supabase
       .from('notes')
       .select('id, title, raw_content, cluster, created_at, is_pinned, is_archived, relevance, image_url, formatted_content, updated_at, user_id')
       .in('id', relatedIds)
 
-    return NextResponse.json({ related: related ?? [] })
+    // Preserve the model's ranking order
+    const ordered = relatedIds
+      .map(id => (related ?? []).find(n => n.id === id))
+      .filter(Boolean)
+
+    return NextResponse.json({ related: ordered })
   } catch (err) {
     console.error('Related notes error:', err)
     return NextResponse.json({ related: [] })

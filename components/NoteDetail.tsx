@@ -20,6 +20,7 @@ type Props = {
   onTogglePin?: (note: Note) => void
   onTagCreated: (tag: Tag) => void
   onOpenRelated?: (note: Note) => void
+  onReminderChanged?: () => void
 }
 
 type DiagramNode = { id: string; label: string; children?: string[] }
@@ -59,7 +60,7 @@ function MindMap({ diagram }: { diagram: Diagram }) {
   )
 }
 
-export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestore, onUpdate, onTogglePin, onTagCreated, onOpenRelated }: Props) {
+export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestore, onUpdate, onTogglePin, onTagCreated, onOpenRelated, onReminderChanged }: Props) {
   const [view, setView] = useState<'raw' | 'formatted' | 'diagram'>('raw')
   const [formatting, setFormatting] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
@@ -293,6 +294,7 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
                 userId={userId}
                 existingReminder={reminder}
                 onReminderSet={setReminder}
+                onReminderChanged={onReminderChanged}
               />
             )}
             {/* History button */}

@@ -8,6 +8,7 @@ type Props = {
   userId: string
   existingReminder?: { id: string; remind_at: string; label?: string } | null
   onReminderSet: (reminder: { id: string; remind_at: string; label?: string } | null) => void
+  onReminderChanged?: () => void
 }
 
 const QUICK_OPTIONS = [
@@ -17,7 +18,7 @@ const QUICK_OPTIONS = [
   { label: 'Next week', hours: 168 },
 ]
 
-export function ReminderButton({ noteId, userId, existingReminder, onReminderSet }: Props) {
+export function ReminderButton({ noteId, userId, existingReminder, onReminderSet, onReminderChanged }: Props) {
   const [open, setOpen] = useState(false)
   const [customDate, setCustomDate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -36,6 +37,7 @@ export function ReminderButton({ noteId, userId, existingReminder, onReminderSet
       if (res.ok) {
         const data = await res.json()
         onReminderSet({ id: data.id, remind_at: data.remind_at })
+        onReminderChanged?.()
         setOpen(false)
         setCustomDate('')
       }
@@ -50,6 +52,7 @@ export function ReminderButton({ noteId, userId, existingReminder, onReminderSet
     try {
       await fetch(`/api/reminders?id=${existingReminder.id}`, { method: 'DELETE' })
       onReminderSet(null)
+      onReminderChanged?.()
       setOpen(false)
     } finally {
       setDismissing(false)

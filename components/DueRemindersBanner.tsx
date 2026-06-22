@@ -12,7 +12,7 @@ type Reminder = {
 
 type Props = {
   reminders: Reminder[]
-  onOpen: (noteId: string) => void
+  onOpen: (noteId: string, reminderId: string) => void
   onDismiss: (reminderId: string) => void
 }
 
@@ -28,7 +28,7 @@ export function DueRemindersBanner({ reminders, onOpen, onDismiss }: Props) {
             {reminders.map(r => (
               <div key={r.id} className="flex items-center gap-2">
                 <button
-                  onClick={() => onOpen(r.note_id)}
+                  onClick={() => onOpen(r.note_id, r.id)}
                   className="min-w-0 flex-1 truncate text-left text-xs font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
                 >
                   {r.notes?.title ?? 'Untitled note'}

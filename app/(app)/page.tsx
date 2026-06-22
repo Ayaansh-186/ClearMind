@@ -31,6 +31,11 @@ type Reminder = {
   notes: { id: string; title: string | null; raw_content: string } | null
 }
 
+function isMac() {
+  if (typeof navigator === 'undefined') return false
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform ?? navigator.userAgent)
+}
+
 export default function Home() {
   const router = useRouter()
   const [user, setUser] = useState<UserState | null>(null)
@@ -47,6 +52,11 @@ export default function Home() {
 
   // ── Command palette ───────────────────────────────────────────────────────
   const [cmdOpen, setCmdOpen] = useState(false)
+  const [kbdHint, setKbdHint] = useState('⌘K')
+
+  useEffect(() => {
+    setKbdHint(isMac() ? '⌘K' : 'Ctrl+K')
+  }, [])
 
   // ── Reminders ─────────────────────────────────────────────────────────────
   const [dueReminders, setDueReminders] = useState<Reminder[]>([])
@@ -111,11 +121,16 @@ export default function Home() {
     })
   }, [router])
 
-  // Poll reminders every 5 minutes
+  // Poll reminders every 60s; also recheck when window gets focus
   useEffect(() => {
     if (!user) return
-    const interval = setInterval(() => fetchDueReminders(user.id), 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    const interval = setInterval(() => fetchDueReminders(user.id), 60 * 1000)
+    const onFocus = () => fetchDueReminders(user.id)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [user])
 
   // Cmd+K / Ctrl+K to open command palette
@@ -364,9 +379,9 @@ export default function Home() {
               <button
                 onClick={() => setCmdOpen(true)}
                 className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-xs text-zinc-500 hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 sm:flex transition"
-                title="Open command palette"
+                title="Open command palette (⌘K / Ctrl+K)"
               >
-                <span>⌘K</span>
+                <span>{kbdHint}</span>
               </button>
             </div>
           </div>
@@ -374,7 +389,10 @@ export default function Home() {
 
         <DueRemindersBanner
           reminders={dueReminders}
-          onOpen={openNoteById}
+          onOpen={(noteId, reminderId) => {
+            openNoteById(noteId)
+            dismissReminder(reminderId)
+          }}
           onDismiss={dismissReminder}
         />
 
@@ -447,6 +465,7 @@ export default function Home() {
         onTogglePin={togglePin}
         onTagCreated={handleTagCreated}
         onOpenRelated={setSelected}
+        onReminderChanged={() => user && fetchDueReminders(user.id)}
       />
       <ChatPanel userId={user.id} activeNote={selected} />
 
