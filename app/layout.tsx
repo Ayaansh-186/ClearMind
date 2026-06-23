@@ -10,22 +10,22 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clarity-delta-two.ve
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Clarity — Self-Organizing Notes',
-    template: '%s · Clarity',
+    default: 'ClearMind — Self-Organizing Notes',
+    template: '%s · ClearMind',
   },
-  description: 'Clarity is a self-organizing notes app for messy thoughts. Capture ideas quickly and let AI sort, format, and cluster them automatically.',
+  description: 'Drop any thought. ClearMind AI sorts, formats, and clusters it automatically. Free to use.',
   keywords: ['notes app', 'AI notes', 'self-organizing notes', 'note taking', 'productivity', 'second brain', 'idea capture'],
-  authors: [{ name: 'Clarity' }],
+  authors: [{ name: 'ClearMind' }],
   openGraph: {
     type: 'website',
     url: siteUrl,
-    siteName: 'Clarity',
-    title: 'Clarity — Self-Organizing Notes',
+    siteName: 'ClearMind',
+    title: 'ClearMind — Self-Organizing Notes',
     description: 'Capture messy thoughts and let AI sort, format, and cluster them automatically.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Clarity — Self-Organizing Notes',
+    title: 'ClearMind — Self-Organizing Notes',
     description: 'Capture messy thoughts and let AI sort, format, and cluster them automatically.',
   },
   verification: {

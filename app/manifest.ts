@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Clarity — Self-Organizing Notes',
-    short_name: 'Clarity',
+    name: 'ClearMind — Self-Organizing Notes',
+    short_name: 'ClearMind',
     description: 'Capture messy thoughts and let AI sort, format, and cluster them automatically.',
     start_url: '/login',
     display: 'standalone',

@@ -20,9 +20,15 @@ export type Note = {
   image_url: string | null
   is_archived: boolean
   is_pinned: boolean
+  is_shared?: boolean
+  share_id?: string | null
+  is_discover?: boolean          // opted into the community Discover feed
   created_at: string
   updated_at: string
-  tags?: Tag[]   // populated by GET /api/notes, optional elsewhere
+  tags?: Tag[]
+  // Populated in discover feed responses
+  author_name?: string | null
+  reaction_count?: number
 }
 
 export const clusters: Cluster[] = ['work', 'ideas', 'personal', 'learning', 'health']

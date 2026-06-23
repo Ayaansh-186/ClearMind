@@ -71,6 +71,8 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
   const [shareUrl, setShareUrl] = useState('')
   const [copied, setCopied] = useState(false)
   const [isShared, setIsShared] = useState(false)
+  const [isDiscover, setIsDiscover] = useState(false)
+  const [togglingDiscover, setTogglingDiscover] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
@@ -93,8 +95,12 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
     setShowHistory(false)
     setReminder(null)
     setRelated([])
+    setIsDiscover(false)
 
     if (!note) return
+
+    // Sync discover status from note
+    setIsDiscover(!!note.is_discover)
 
     // Fetch existing reminder for this note
     fetch(`/api/reminders?user_id=${userId}`)
@@ -162,6 +168,22 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
         setIsShared(false)
       }
     } finally { setSharing(false) }
+  }
+
+  async function toggleDiscover() {
+    setTogglingDiscover(true)
+    try {
+      const next = !isDiscover
+      const res = await fetch('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_id: note!.id, user_id: userId, is_discover: next }),
+      })
+      if (res.ok) {
+        setIsDiscover(next)
+        onUpdate({ ...note!, is_discover: next })
+      }
+    } finally { setTogglingDiscover(false) }
   }
 
   async function copyLink() {
@@ -358,7 +380,7 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
           )}
 
           {/* Share section */}
-          <div className={`mb-4 rounded-xl border p-3 transition ${isShared ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'}`}>
+          <div className={`mb-3 rounded-xl border p-3 transition ${isShared ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 {isShared ? <Globe size={15} className="text-green-600 shrink-0" /> : <GlobeLock size={15} className="text-zinc-400 shrink-0" />}
@@ -378,6 +400,30 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Discover community toggle */}
+          <div className={`mb-4 rounded-xl border p-3 transition ${isDiscover ? 'border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/20' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={15} className={isDiscover ? 'text-indigo-500 shrink-0' : 'text-zinc-400 shrink-0'} />
+                <div>
+                  <p className="text-xs font-medium">{isDiscover ? 'In the Discover feed' : 'Share to Discover'}</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">{isDiscover ? 'Anyone can find and save this note' : 'Let the community discover this note'}</p>
+                </div>
+              </div>
+              <button
+                onClick={toggleDiscover}
+                disabled={togglingDiscover}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  isDiscover
+                    ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-950/30 dark:text-red-400'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                } disabled:opacity-50`}
+              >
+                {togglingDiscover ? <Loader2 size={12} className="animate-spin inline" /> : isDiscover ? 'Remove' : 'Publish'}
+              </button>
+            </div>
           </div>
 
           {/* Tags */}

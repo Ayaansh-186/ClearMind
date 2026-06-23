@@ -8,7 +8,6 @@ type Props = {
   note: Note
   onOpen: (note: Note) => void
   onTogglePin?: (note: Note) => void
-  // Bulk select
   selectable?: boolean
   selected?: boolean
   onSelect?: (note: Note) => void
@@ -28,7 +27,7 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
   const isProcessing = !note.title
 
   function handleClick(e: React.MouseEvent) {
-    if (selectable) { e.preventDefault(); onSelect?.(note); return }
+    if (selectable || onSelect) { e.preventDefault(); onSelect?.(note); return }
     onOpen(note)
   }
 
@@ -37,18 +36,9 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
     onTogglePin?.(note)
   }
 
-  function handleLongPress() {
-    if (!selectable) onSelect?.(note)
-  }
-
-  // Long-press support for mobile
   let pressTimer: ReturnType<typeof setTimeout> | null = null
-  function onTouchStart() {
-    pressTimer = setTimeout(handleLongPress, 500)
-  }
-  function onTouchEnd() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
-  }
+  function onTouchStart() { pressTimer = setTimeout(() => onSelect?.(note), 500) }
+  function onTouchEnd() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null } }
 
   return (
     <button
@@ -56,97 +46,121 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onTouchMove={onTouchEnd}
-      className={`group relative flex min-h-[13rem] w-full flex-col rounded-xl border p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative flex min-h-[13rem] w-full flex-col rounded-2xl text-left transition-all duration-200 card-lift overflow-hidden ${
         selected
-          ? 'border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950 ring-2 ring-zinc-950 dark:ring-white'
-          : note.is_pinned
-            ? 'border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/10'
-            : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700'
+          ? 'ring-2 ring-indigo-500 shadow-lg shadow-indigo-500/20'
+          : ''
       }`}
+      style={{
+        background: selected ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--card)',
+        border: `1px solid ${selected ? 'transparent' : 'var(--card-border)'}`,
+      }}
     >
-      {/* Bulk select checkbox */}
-      {selectable && (
-        <span className="absolute right-3 top-3 z-10">
+      {/* Cluster left-border accent */}
+      {colors && !selected && (
+        <span
+          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+          style={{ backgroundColor: colors.dot }}
+        />
+      )}
+
+      {/* Checkbox — visible on hover (desktop) and always in select mode */}
+      {(selectable || onSelect) && (
+        <span
+          role="button"
+          title="Select note"
+          onClick={e => { e.stopPropagation(); onSelect?.(note) }}
+          className={`absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-opacity ${
+            selectable ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+        >
           {selected
-            ? <CheckCircle2 size={20} className="text-white dark:text-zinc-950" fill="currentColor" />
+            ? <CheckCircle2 size={20} className="text-white" fill="currentColor" />
             : <Circle size={20} className="text-zinc-300 dark:text-zinc-600" />}
         </span>
       )}
 
-      {/* Pin toggle — hide in select mode */}
+      {/* Pin */}
       {!selectable && onTogglePin && (
         <span
           role="button"
           tabIndex={0}
           onClick={handlePinClick}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePinClick(e as unknown as React.MouseEvent) } }}
-          aria-label={note.is_pinned ? 'Unpin note' : 'Pin note'}
-          title={note.is_pinned ? 'Unpin note' : 'Pin note'}
-          className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full transition ${
-            note.is_pinned
-              ? 'text-amber-500 opacity-100'
-              : 'text-zinc-300 opacity-60 hover:text-zinc-500 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 dark:text-zinc-700 dark:hover:text-zinc-400'
+          onKeyDown={e => { if (e.key === 'Enter') handlePinClick(e as unknown as React.MouseEvent) }}
+          aria-label={note.is_pinned ? 'Unpin' : 'Pin'}
+          className={`absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full transition-opacity ${
+            note.is_pinned ? 'text-amber-500 opacity-100' : 'text-zinc-300 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100'
           }`}
         >
-          <Pin size={15} fill={note.is_pinned ? 'currentColor' : 'none'} className={note.is_pinned ? 'rotate-0' : '-rotate-45'} />
+          <Pin size={14} fill={note.is_pinned ? 'currentColor' : 'none'} />
         </span>
       )}
 
-      {/* Top row */}
-      <div className="mb-3 flex items-center justify-between gap-2 pr-7">
-        {colors ? (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${selected ? 'bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950' : ''}`}
-            style={!selected ? { backgroundColor: colors.bg, color: colors.text } : {}}>
-            {note.cluster}
+      <div className="flex flex-1 flex-col p-5 pl-6">
+        {/* Cluster badge + time */}
+        <div className="mb-3 flex items-center justify-between gap-2 pr-7">
+          {colors ? (
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide capitalize"
+              style={selected
+                ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                : { backgroundColor: colors.bg, color: colors.text }}
+            >
+              {note.cluster}
+            </span>
+          ) : (
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium text-zinc-400" style={{ background: 'var(--background)' }}>
+              {isProcessing ? (
+                <span className="flex items-center gap-1">
+                  {[0, 150, 300].map(d => (
+                    <span key={d} className="inline-block h-1 w-1 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: `${d}ms` }} />
+                  ))}
+                </span>
+              ) : 'unsorted'}
+            </span>
+          )}
+          <span className={`shrink-0 text-[11px] ${selected ? 'text-white/70' : 'text-zinc-400'}`}>
+            {relativeTime(note.created_at)}
           </span>
+        </div>
+
+        {/* Title */}
+        {isProcessing ? (
+          <div className="space-y-2">
+            <div className="h-5 w-3/4 animate-pulse rounded-lg" style={{ background: 'var(--card-border)' }} />
+            <div className="h-4 w-1/2 animate-pulse rounded-lg" style={{ background: 'var(--card-border)' }} />
+          </div>
         ) : (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${selected ? 'bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950' : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-900'}`}>
-            {isProcessing ? (
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '0ms' }} />
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '150ms' }} />
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '300ms' }} />
-              </span>
-            ) : 'unsorted'}
-          </span>
+          <h3 className={`line-clamp-2 text-[15px] font-semibold leading-snug ${selected ? 'text-white' : 'text-zinc-900 dark:text-zinc-50'}`}>
+            {note.title}
+          </h3>
         )}
-        <span className={`shrink-0 text-xs ${selected ? 'text-white/70 dark:text-zinc-950/60' : 'text-zinc-400'}`}>{relativeTime(note.created_at)}</span>
-      </div>
 
-      {/* Title */}
-      {isProcessing ? (
-        <div className="space-y-2">
-          <div className="h-5 w-3/4 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800" />
-          <div className="h-4 w-1/2 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-800" />
+        {/* Preview */}
+        <p className={`mt-2 line-clamp-2 text-[13px] leading-relaxed ${selected ? 'text-white/70' : 'text-zinc-500 dark:text-zinc-400'}`}>
+          {note.raw_content}
+        </p>
+
+        {/* Tags */}
+        {note.tags && note.tags.length > 0 && !selected && (
+          <div className="mt-3"><TagChips tags={note.tags} /></div>
+        )}
+
+        {/* Relevance bar */}
+        <div className="mt-auto flex items-center gap-0.5 pt-4">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <span
+              key={i}
+              className="h-1 flex-1 rounded-full transition-colors"
+              style={{
+                backgroundColor: i < note.relevance
+                  ? selected ? 'rgba(255,255,255,0.8)' : (colors?.dot ?? '#6366f1')
+                  : selected ? 'rgba(255,255,255,0.15)' : 'var(--card-border)',
+              }}
+            />
+          ))}
+          <span className={`ml-2 text-[11px] shrink-0 ${selected ? 'text-white/60' : 'text-zinc-400'}`}>{note.relevance}/10</span>
         </div>
-      ) : (
-        <h3 className={`line-clamp-2 text-base font-semibold leading-snug ${selected ? 'text-white dark:text-zinc-950' : 'text-zinc-950 dark:text-zinc-50'}`}>
-          {note.title}
-        </h3>
-      )}
-
-      {/* Preview */}
-      <p className={`mt-2 line-clamp-2 text-sm leading-relaxed ${selected ? 'text-white/70 dark:text-zinc-950/60' : 'text-zinc-500 dark:text-zinc-400'}`}>
-        {note.raw_content}
-      </p>
-
-      {/* Tags */}
-      {note.tags && note.tags.length > 0 && !selected && (
-        <div className="mt-3">
-          <TagChips tags={note.tags} />
-        </div>
-      )}
-
-      {/* Relevance dots */}
-      <div className="mt-auto flex items-center gap-1 pt-4">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <span key={i} className={`h-1.5 w-1.5 rounded-full transition-colors ${
-            i < note.relevance
-              ? selected ? 'bg-white/80 dark:bg-zinc-950/80' : 'bg-zinc-800 dark:bg-zinc-200'
-              : selected ? 'bg-white/20 dark:bg-zinc-950/20' : 'bg-zinc-200 dark:bg-zinc-700'
-          }`} />
-        ))}
-        <span className={`ml-1.5 text-xs ${selected ? 'text-white/60 dark:text-zinc-950/50' : 'text-zinc-400'}`}>{note.relevance}/10</span>
       </div>
     </button>
   )

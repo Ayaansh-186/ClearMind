@@ -1,174 +1,567 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
+'use client'
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clarity-delta-two.vercel.app'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Pin, Search, Sparkles, X } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
+import { BulkActionBar } from '@/components/BulkActionBar'
+import { CaptureBar } from '@/components/CaptureBar'
+import { ChatPanel } from '@/components/ChatPanel'
+import { CommandPalette } from '@/components/CommandPalette'
+import { DueRemindersBanner } from '@/components/DueRemindersBanner'
+import { InstallBanner } from '@/components/InstallBanner'
+import { NoteCard } from '@/components/NoteCard'
+import { NoteDetail } from '@/components/NoteDetail'
+import { OnboardingModal } from '@/components/OnboardingModal'
+import { Sidebar, type ViewKey } from '@/components/Sidebar'
+import { useOnboarding } from '@/lib/useOnboarding'
+import { clusters, type Note, type Tag } from '@/lib/types'
 
-export const metadata: Metadata = {
-  title: 'Clarity — AI Notes App That Organizes Itself',
-  description:
-    'Stop organizing notes manually. Clarity uses AI to automatically sort, format, and cluster your thoughts into Work, Ideas, Personal, Learning, and Health. Free to use.',
-  alternates: { canonical: siteUrl },
-  openGraph: {
-    title: 'Clarity — AI Notes App That Organizes Itself',
-    description:
-      'Stop organizing notes manually. Clarity uses AI to automatically sort, format, and cluster your thoughts.',
-    url: siteUrl,
-    type: 'website',
-  },
+function getBrowserClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 
-const features = [
-  {
-    icon: '✦',
-    title: 'AI-powered clustering',
-    desc: 'Drop any thought. Clarity automatically sorts it into Work, Ideas, Personal, Learning, or Health.',
-  },
-  {
-    icon: '🎙️',
-    title: 'Voice capture',
-    desc: 'Record audio notes anywhere. Whisper AI transcribes and formats them instantly.',
-  },
-  {
-    icon: '🔗',
-    title: 'Related notes',
-    desc: 'Every note surfaces the 4 most semantically related notes — like a personal knowledge graph.',
-  },
-  {
-    icon: '⌘',
-    title: 'Command palette',
-    desc: 'Jump to any note, view, or tool without leaving the keyboard. Press ⌘K.',
-  },
-  {
-    icon: '📅',
-    title: 'Reminders',
-    desc: 'Snooze any note to resurface it later — in 1 hour, tomorrow, or a custom date.',
-  },
-  {
-    icon: '📊',
-    title: 'Weekly AI digest',
-    desc: 'A personalized weekly review of what you captured, what\'s stale, and what matters.',
-  },
-]
-
-// JSON-LD structured data for Google rich results
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Clarity',
-  applicationCategory: 'ProductivityApplication',
-  operatingSystem: 'Web',
-  description:
-    'Self-organizing AI notes app. Capture ideas, voice notes, and thoughts — AI sorts, formats, and clusters them automatically.',
-  url: siteUrl,
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
-  featureList: [
-    'AI note clustering',
-    'Voice note transcription',
-    'Related notes discovery',
-    'Weekly AI digest',
-    'Note reminders',
-    'Knowledge graph',
-    'Version history',
-  ],
+type UserState = { id: string; email?: string }
+type Reminder = {
+  id: string
+  remind_at: string
+  note_id: string
+  label?: string | null
+  notes: { id: string; title: string | null; raw_content: string } | null
 }
 
-export default function LandingPage() {
+function isMac() {
+  if (typeof navigator === 'undefined') return false
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform ?? navigator.userAgent)
+}
+
+export default function Home() {
+  const router = useRouter()
+  const [user, setUser] = useState<UserState | null>(null)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [allNotes, setAllNotes] = useState<Note[]>([]) // always keep all notes for counts
+  const [activeView, setActiveView] = useState<ViewKey>('surface')
+  const [selected, setSelected] = useState<Note | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // ── Tags state ───────────────────────────────────────────────────────────
+  const [tags, setTags] = useState<Tag[]>([])
+  const [activeTagId, setActiveTagId] = useState<string | null>(null)
+
+  // ── Bulk selection ────────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const inSelectMode = selectedIds.size > 0
+
+  function toggleSelect(note: Note) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(note.id)) next.delete(note.id)
+      else next.add(note.id)
+      return next
+    })
+  }
+
+  function clearSelection() { setSelectedIds(new Set()) }
+
+  async function bulkArchive() {
+    const ids = [...selectedIds]
+    await Promise.all(ids.map(id =>
+      fetch(`/api/notes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_archived: true }) })
+    ))
+    setNotes(curr => curr.filter(n => !ids.includes(n.id)))
+    setAllNotes(curr => curr.map(n => ids.includes(n.id) ? { ...n, is_archived: true } : n))
+    clearSelection()
+  }
+
+  async function bulkDelete() {
+    const ids = [...selectedIds]
+    await Promise.all(ids.map(id => fetch(`/api/notes/${id}`, { method: 'DELETE' })))
+    setNotes(curr => curr.filter(n => !ids.includes(n.id)))
+    setAllNotes(curr => curr.filter(n => !ids.includes(n.id)))
+    clearSelection()
+  }
+
+  async function bulkTagAll(tagId: string) {
+    const ids = [...selectedIds]
+    await Promise.all(ids.map(id =>
+      fetch(`/api/notes/${id}/tags`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag_id: tagId }) })
+    ))
+    clearSelection()
+  }
+
+  async function bulkExport(format: 'md' | 'txt') {
+    if (!user) return
+    const ids = [...selectedIds]
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, note_ids: ids, format }),
+    })
+    if (!res.ok) return
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `clarity-export-${new Date().toISOString().slice(0, 10)}.${format}`
+    a.click()
+    URL.revokeObjectURL(url)
+    clearSelection()
+  }
+  const [cmdOpen, setCmdOpen] = useState(false)
+  const [kbdHint, setKbdHint] = useState('⌘K')
+
+  useEffect(() => {
+    setKbdHint(isMac() ? '⌘K' : 'Ctrl+K')
+  }, [])
+
+  // ── Reminders ─────────────────────────────────────────────────────────────
+  const [dueReminders, setDueReminders] = useState<Reminder[]>([])
+
+  // Onboarding: pass null until we've loaded notes (prevents flash)
+  const noteCount = loading ? null : allNotes.length
+  const { shouldShow: showOnboarding, complete: completeOnboarding, dismiss: dismissOnboarding } = useOnboarding(noteCount)
+
+  // Fetch ALL notes for counts, and filtered notes for current view + active tag
+  const fetchNotes = useCallback(async (view = activeView, userId?: string, tagId = activeTagId) => {
+    const uid = userId ?? user?.id
+    if (!uid) return
+
+    // Always fetch ALL notes (archived + non-archived) for sidebar counts
+    const allRes = await fetch(`/api/notes?user_id=${uid}&archived=all`)
+    if (allRes.ok) {
+      const all = await allRes.json() as Note[]
+      setAllNotes(all)
+    }
+
+    // Fetch filtered notes for current view (+ tag, if one is active)
+    const params = new URLSearchParams({ user_id: uid })
+    if (view === 'archived') params.set('archived', 'true')
+    if (clusters.includes(view as never)) params.set('cluster', view)
+    if (tagId) params.set('tag_id', tagId)
+
+    const res = await fetch(`/api/notes?${params.toString()}`)
+    if (res.ok) {
+      let data = await res.json() as Note[]
+      if (view === 'recent') {
+        data = data.filter(n => Date.now() - new Date(n.created_at).getTime() < 7 * 24 * 60 * 60 * 1000)
+      }
+      if (view === 'archived') {
+        data = data.filter(n => n.is_archived)
+      } else {
+        data = data.filter(n => !n.is_archived)
+      }
+      setNotes(data)
+      setSelected(curr => curr ? data.find(n => n.id === curr.id) ?? curr : curr)
+    }
+
+    setLoading(false)
+  }, [activeView, activeTagId, user])
+
+  const fetchTags = useCallback(async (userId?: string) => {
+    const uid = userId ?? user?.id
+    if (!uid) return
+    const res = await fetch(`/api/tags?user_id=${uid}`)
+    if (res.ok) setTags(await res.json())
+  }, [user])
+
+  useEffect(() => {
+    const supabase = getBrowserClient()
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session?.user) { router.replace('/login'); return }
+      const u = { id: data.session.user.id, email: data.session.user.email }
+      setUser(u)
+      fetchNotes(activeView, u.id)
+      fetchTags(u.id)
+      // Initial reminder fetch
+      fetchDueReminders(u.id)
+    })
+  }, [router])
+
+  // Poll reminders every 60s; also recheck when window gets focus
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(() => fetchDueReminders(user.id), 60 * 1000)
+    const onFocus = () => fetchDueReminders(user.id)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [user])
+
+  // Cmd+K / Ctrl+K to open command palette
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(() => fetchNotes(), 3000)
+    return () => clearInterval(interval)
+  }, [fetchNotes, user])
+
+  // Re-fetch notes whenever the active tag changes
+  useEffect(() => {
+    if (!user) return
+    fetchNotes(activeView, user.id, activeTagId)
+  }, [activeTagId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {
+      surface: allNotes.filter(n => !n.is_archived).length,
+      all: allNotes.filter(n => !n.is_archived).length,
+      recent: allNotes.filter(n => !n.is_archived && Date.now() - new Date(n.created_at).getTime() < 7 * 24 * 60 * 60 * 1000).length,
+      archived: allNotes.filter(n => n.is_archived).length,
+    }
+    for (const cluster of clusters) {
+      result[cluster] = allNotes.filter(n => n.cluster === cluster && !n.is_archived).length
+    }
+    return result
+  }, [allNotes])
+
+  function mergeNote(note: Note) {
+    setNotes(curr => {
+      const withoutTemp = curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
+      const exists = withoutTemp.some(n => n.id === note.id)
+      return exists ? withoutTemp.map(n => n.id === note.id ? { ...n, ...note } : n) : [note, ...withoutTemp]
+    })
+    setAllNotes(curr => {
+      const withoutTemp = curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
+      const exists = withoutTemp.some(n => n.id === note.id)
+      return exists ? withoutTemp.map(n => n.id === note.id ? { ...n, ...note } : n) : [note, ...withoutTemp]
+    })
+  }
+
+  function handleOnboardingComplete(note: Note) {
+    mergeNote(note)
+    completeOnboarding()
+  }
+
+  // ── Tag handlers ─────────────────────────────────────────────────────────
+  async function fetchDueReminders(uid: string) {
+    const res = await fetch(`/api/reminders?user_id=${uid}`)
+    if (!res.ok) return
+    const all: Array<{ id: string; remind_at: string; note_id: string; label?: string | null; notes: { id: string; title: string | null; raw_content: string } | null }> = await res.json()
+    // Show only reminders that are due or overdue
+    const now = Date.now()
+    setDueReminders(all.filter(r => new Date(r.remind_at).getTime() <= now))
+  }
+
+  async function dismissReminder(reminderId: string) {
+    await fetch(`/api/reminders?id=${reminderId}`, { method: 'DELETE' })
+    setDueReminders(curr => curr.filter(r => r.id !== reminderId))
+  }
+
+  function openNoteById(noteId: string) {
+    const note = allNotes.find(n => n.id === noteId)
+    if (note) setSelected(note)
+  }
+
+  // ── Tag handlers ─────────────────────────────────────────────────────────
+  async function createTag(name: string) {
+    if (!user) return
+    const res = await fetch('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, name }),
+    })
+    if (res.ok) {
+      const tag: Tag = await res.json()
+      setTags(curr => curr.some(t => t.id === tag.id) ? curr : [...curr, tag].sort((a, b) => a.name.localeCompare(b.name)))
+    }
+  }
+
+  async function deleteTag(tagId: string) {
+    setTags(curr => curr.filter(t => t.id !== tagId))
+    if (activeTagId === tagId) setActiveTagId(null)
+    await fetch(`/api/tags/${tagId}`, { method: 'DELETE' })
+    // Notes may have lost a tag — refresh to keep chips accurate
+    fetchNotes()
+  }
+
+  function handleTagCreated(tag: Tag) {
+    setTags(curr => curr.some(t => t.id === tag.id) ? curr : [...curr, tag].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
+  async function togglePin(note: Note) {
+    const nextPinned = !note.is_pinned
+
+    // Optimistic update
+    setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
+    setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
+    setSelected(curr => curr?.id === note.id ? { ...curr, is_pinned: nextPinned } : curr)
+
+    try {
+      const res = await fetch(`/api/notes/${note.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_pinned: nextPinned }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        mergeNote({ ...updated, tags: note.tags })
+      } else {
+        setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+        setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+      }
+    } catch {
+      setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+      setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: note.is_pinned } : n))
+    }
+  }
+
+  async function archiveNote(id: string) {
+    const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      const updated = await res.json()
+      setNotes(curr => curr.filter(n => n.id !== id))
+      setAllNotes(curr => curr.map(n => n.id === id ? { ...n, is_archived: true, ...updated } : n))
+      setSelected(null)
+    }
+  }
+
+  async function restoreNote(id: string) {
+    const res = await fetch(`/api/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_archived: false })
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setAllNotes(curr => curr.map(n => n.id === id ? { ...n, is_archived: false, ...updated } : n))
+      setSelected(null)
+    }
+  }
+
+  async function signOut() {
+    await getBrowserClient().auth.signOut()
+    router.replace('/login')
+  }
+
+  const viewTitle: Record<string, string> = {
+    surface: 'What matters now', all: 'All notes', recent: 'Recent', archived: 'Archived',
+    work: 'Work', ideas: 'Ideas', personal: 'Personal', learning: 'Learning', health: 'Health'
+  }
+
+  const activeTagName = activeTagId ? tags.find(t => t.id === activeTagId)?.name : null
+
+  const displayedNotes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return notes
+
+    const pool = activeView === 'archived' ? allNotes.filter(n => n.is_archived) : allNotes.filter(n => !n.is_archived)
+    const tagFiltered = activeTagId ? pool.filter(n => n.tags?.some(t => t.id === activeTagId)) : pool
+
+    return tagFiltered.filter(n => {
+      const title = (n.title ?? '').toLowerCase()
+      const raw = n.raw_content.toLowerCase()
+      const formatted = (n.formatted_content ?? '').toLowerCase()
+      return title.includes(q) || raw.includes(q) || formatted.includes(q)
+    })
+  }, [searchQuery, notes, allNotes, activeView, activeTagId])
+
+  // Split into pinned / unpinned. Pinned section is hidden in the archived view
+  // (archived notes shouldn't clutter a "pinned" shelf) and while searching.
+  const showPinnedSection = activeView !== 'archived' && !searchQuery.trim()
+  const pinnedNotes = showPinnedSection ? displayedNotes.filter(n => n.is_pinned) : []
+  const unpinnedNotes = showPinnedSection ? displayedNotes.filter(n => !n.is_pinned) : displayedNotes
+
+  function changeView(view: ViewKey) {
+    setActiveView(view)
+    fetchNotes(view, undefined, activeTagId)
+  }
+
+  function changeTag(tagId: string | null) {
+    setActiveTagId(tagId)
+  }
+
+  if (!user) return (
+    <main className="grid min-h-screen place-items-center bg-white text-zinc-500 dark:bg-zinc-950">
+      Opening Clarity...
+    </main>
+  )
+
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    <main className="min-h-screen bg-white text-zinc-950 md:pl-[260px] dark:bg-zinc-950 dark:text-zinc-50">
+      {/* Bulk action bar — replaces header when notes are selected */}
+      {inSelectMode && (
+        <BulkActionBar
+          count={selectedIds.size}
+          selectedIds={[...selectedIds]}
+          allTags={tags}
+          userId={user.id}
+          onArchive={bulkArchive}
+          onDelete={bulkDelete}
+          onExport={bulkExport}
+          onTagAll={bulkTagAll}
+          onClear={clearSelection}
+        />
+      )}
+
+      <Sidebar
+        activeView={activeView}
+        counts={counts}
+        email={user.email ?? ''}
+        tags={tags}
+        activeTagId={activeTagId}
+        onChangeView={changeView}
+        onChangeTag={changeTag}
+        onCreateTag={createTag}
+        onSignOut={signOut}
       />
-
-      <main className="min-h-screen bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
-        {/* Nav */}
-        <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-950 text-white dark:bg-white dark:text-zinc-950">
-              <span className="text-sm font-bold">C</span>
+      <section className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+          <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {activeTagName ? `#${activeTagName}` : (viewTitle[activeView] ?? activeView)}
+              </h1>
+              <p className="mt-1 text-sm text-zinc-500">
+                {activeTagName
+                  ? <>Notes tagged <span className="font-medium">{activeTagName}</span> · <button onClick={() => setActiveTagId(null)} className="underline hover:text-zinc-700 dark:hover:text-zinc-300">clear filter</button></>
+                  : 'Drop the messy version. Clarity will keep sorting.'}
+              </p>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Clarity</span>
-          </div>
-          <Link
-            href="/login"
-            className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-          >
-            Get started free →
-          </Link>
-        </nav>
-
-        {/* Hero */}
-        <section className="mx-auto max-w-4xl px-6 pb-16 pt-20 text-center">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-1.5 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            Free · No credit card
-          </div>
-          <h1 className="mb-5 text-5xl font-bold tracking-tight leading-tight sm:text-6xl">
-            Notes that<br />
-            <span className="text-zinc-400">organize themselves</span>
-          </h1>
-          <p className="mx-auto mb-10 max-w-xl text-lg text-zinc-500">
-            Stop filing notes into folders. Clarity uses AI to automatically sort, format,
-            and cluster every thought you capture — into Work, Ideas, Personal, Learning, and Health.
-          </p>
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/login"
-              className="w-full rounded-xl bg-zinc-950 px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 sm:w-auto"
-            >
-              Start for free
-            </Link>
-            <Link
-              href="/login"
-              className="w-full rounded-xl border border-zinc-200 px-8 py-3.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 sm:w-auto"
-            >
-              Sign in
-            </Link>
-          </div>
-        </section>
-
-        {/* Features */}
-        <section className="mx-auto max-w-5xl px-6 pb-24">
-          <h2 className="mb-10 text-center text-2xl font-semibold tracking-tight">
-            Everything your notes app is missing
-          </h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map(f => (
-              <div
-                key={f.title}
-                className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="mb-3 text-2xl">{f.icon}</div>
-                <h3 className="mb-1.5 text-sm font-semibold">{f.title}</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed">{f.desc}</p>
+            <div className="flex items-center gap-2">
+              <div className="relative w-full sm:w-72">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search notes..."
+                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-9 py-2 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:focus:border-zinc-600"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
+                    <X size={15} />
+                  </button>
+                )}
               </div>
-            ))}
+              <button
+                onClick={() => setCmdOpen(true)}
+                className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-xs text-zinc-500 hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 sm:flex transition"
+                title="Open command palette (⌘K / Ctrl+K)"
+              >
+                <span>{kbdHint}</span>
+              </button>
+            </div>
           </div>
-        </section>
+        </header>
 
-        {/* CTA */}
-        <section className="border-t border-zinc-200 bg-zinc-950 py-20 text-center dark:border-zinc-800">
-          <h2 className="mb-4 text-3xl font-bold tracking-tight text-white">
-            Your second brain, sorted.
-          </h2>
-          <p className="mb-8 text-zinc-400">Free to use. Works in your browser. No setup required.</p>
-          <Link
-            href="/login"
-            className="inline-flex rounded-xl bg-white px-8 py-3.5 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200"
-          >
-            Get started free →
-          </Link>
-        </section>
+        <DueRemindersBanner
+          reminders={dueReminders}
+          onOpen={(noteId, reminderId) => {
+            openNoteById(noteId)
+            dismissReminder(reminderId)
+          }}
+          onDismiss={dismissReminder}
+        />
 
-        {/* Footer */}
-        <footer className="border-t border-zinc-200 px-6 py-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
-          © {new Date().getFullYear()} Clarity · Built with Next.js & Groq AI
-        </footer>
-      </main>
-    </>
+        <div className="flex-1 overflow-y-auto px-5 py-6 pb-52 md:pb-6">
+          <div className="mx-auto max-w-5xl">
+            {loading ? (
+              <div className="grid min-h-80 place-items-center text-zinc-500">Loading notes...</div>
+            ) : displayedNotes.length === 0 ? (
+              <div className="grid min-h-80 place-items-center text-center text-zinc-500">
+                <div>
+                  <Sparkles className="mx-auto mb-3 h-7 w-7 text-zinc-400" />
+                  <p>
+                    {searchQuery ? `No notes match "${searchQuery}"`
+                      : activeTagName ? `No notes tagged "${activeTagName}" yet`
+                      : 'Your mind is clear. Add your first thought below.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Pinned section */}
+                {pinnedNotes.length > 0 && (
+                  <div className="mb-8">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Pin size={13} className="text-amber-500" fill="currentColor" />
+                      <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                        Pinned
+                      </h2>
+                      <span className="text-xs text-zinc-300 dark:text-zinc-700">· {pinnedNotes.length}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {pinnedNotes.map(note => (
+                        <NoteCard key={note.id} note={note} onOpen={setSelected} onTogglePin={togglePin}
+                          selectable={inSelectMode} selected={selectedIds.has(note.id)} onSelect={toggleSelect} />
+                      ))}
+                    </div>
+                    {unpinnedNotes.length > 0 && (
+                      <div className="mt-8 mb-3 flex items-center gap-2">
+                        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                          {viewTitle[activeView] ?? 'Notes'}
+                        </h2>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Everything else */}
+                {unpinnedNotes.length > 0 && (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {unpinnedNotes.map(note => (
+                      <NoteCard key={note.id} note={note} onOpen={setSelected} onTogglePin={togglePin}
+                        selectable={inSelectMode} selected={selectedIds.has(note.id)} onSelect={toggleSelect} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        <CaptureBar userId={user.id} onCreate={mergeNote} />
+      </section>
+
+      <NoteDetail
+        note={selected}
+        userId={user.id}
+        allTags={tags}
+        onClose={() => setSelected(null)}
+        onArchive={archiveNote}
+        onRestore={restoreNote}
+        onUpdate={mergeNote}
+        onTogglePin={togglePin}
+        onTagCreated={handleTagCreated}
+        onOpenRelated={setSelected}
+        onReminderChanged={() => user && fetchDueReminders(user.id)}
+      />
+      <ChatPanel userId={user.id} activeNote={selected} />
+
+      {/* Command Palette */}
+      {cmdOpen && (
+        <CommandPalette
+          notes={allNotes.filter(n => !n.is_archived)}
+          onOpenNote={setSelected}
+          onChangeView={changeView}
+          onClose={() => setCmdOpen(false)}
+        />
+      )}
+
+      {/* Onboarding modal — only shown to first-time users */}
+      {showOnboarding && (
+        <OnboardingModal
+          userId={user.id}
+          onComplete={handleOnboardingComplete}
+          onDismiss={dismissOnboarding}
+        />
+      )}
+      <InstallBanner />
+    </main>
   )
 }

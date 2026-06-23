@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Download, X, Smartphone } from 'lucide-react'
+import { Download, X, Smartphone, Share } from 'lucide-react'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -15,24 +15,29 @@ export function InstallBanner() {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    // Don't show if already installed (running in standalone mode)
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true)
+    // Register service worker (required for Android install prompt)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error)
+    }
+
+    // Already installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true)
     if (isStandalone) return
 
-    // Don't show if user dismissed within the last 7 days
-    const lastDismissed = localStorage.getItem('clarity_install_dismissed')
-    if (lastDismissed && Date.now() - Number(lastDismissed) < 7 * 24 * 60 * 60 * 1000) return
+    // Dismissed recently (14 days)
+    const lastDismissed = localStorage.getItem('clearmind_install_dismissed')
+    if (lastDismissed && Date.now() - Number(lastDismissed) < 14 * 24 * 60 * 60 * 1000) return
 
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) && !('MSStream' in window)
+
     if (ios) {
-      // Show iOS instructions after a short delay
-      setTimeout(() => { setIsIos(true); setShow(true) }, 3000)
+      // iOS Safari — show instructions after 4s
+      setTimeout(() => { setIsIos(true); setShow(true) }, 4000)
       return
     }
 
-    // Android / Chrome — listen for the native install prompt
+    // Android/Chrome — capture beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
@@ -43,7 +48,7 @@ export function InstallBanner() {
   }, [])
 
   function dismiss() {
-    localStorage.setItem('clarity_install_dismissed', String(Date.now()))
+    localStorage.setItem('clearmind_install_dismissed', String(Date.now()))
     setDismissed(true)
     setShow(false)
   }
@@ -51,47 +56,38 @@ export function InstallBanner() {
   async function install() {
     if (!deferredPrompt) return
     await deferredPrompt.prompt()
-    const choice = await deferredPrompt.userChoice
-    if (choice.outcome === 'accepted') {
-      setShow(false)
-      setDeferredPrompt(null)
-    }
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') { setShow(false); setDeferredPrompt(null) }
   }
 
   if (!show || dismissed) return null
 
   return (
-    <div className="fixed bottom-[var(--mobile-nav-offset)] inset-x-0 z-30 px-3 pb-2 md:hidden">
-      <div className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white dark:bg-white dark:text-zinc-950">
+    <div className="fixed bottom-[calc(var(--mobile-nav-offset)+0.75rem)] inset-x-3 z-30 md:hidden">
+      <div className="flex items-start gap-3 rounded-2xl p-4 shadow-2xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-md"
+          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
           <Smartphone size={20} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Add Clarity to your home screen</p>
+          <p className="text-sm font-semibold">Install ClearMind</p>
           {isIos ? (
             <p className="mt-0.5 text-xs text-zinc-500">
-              Tap <span className="font-medium">Share</span> then{' '}
-              <span className="font-medium">"Add to Home Screen"</span> in Safari
+              Tap <Share size={11} className="inline" /> then <span className="font-medium">"Add to Home Screen"</span>
             </p>
           ) : (
-            <p className="mt-0.5 text-xs text-zinc-500">
-              Install as an app for faster access — works offline too
-            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">Works offline · Faster launch · Feels native</p>
           )}
           {!isIos && (
-            <button
-              onClick={install}
-              className="mt-2 flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950"
-            >
+            <button onClick={install}
+              className="mt-2.5 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
               <Download size={13} /> Install app
             </button>
           )}
         </div>
-        <button
-          onClick={dismiss}
-          className="shrink-0 rounded-md p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition"
-          aria-label="Dismiss"
-        >
+        <button onClick={dismiss} className="shrink-0 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
           <X size={16} />
         </button>
       </div>
