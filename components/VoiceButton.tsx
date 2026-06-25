@@ -8,7 +8,7 @@ type RecordingState = 'idle' | 'recording' | 'transcribing' | 'error'
 
 type Props = {
   userId: string
-  onCreate: (note: Note) => void
+  onCreate: (note: Note & { _tempId?: string }) => void
   disabled?: boolean
   onRecordingChange?: (recording: boolean) => void
 }
@@ -27,6 +27,9 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
   const animFrameRef = useRef<number | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  // FIX: store tempId in a ref so submitRecording() can reference it reliably
+  // without closure staleness, enabling exact card matching in mergeNote().
+  const tempIdRef = useRef<string>('')
 
   // ── Waveform animation ────────────────────────────────────────────────────
   const animateBars = useCallback(() => {
@@ -34,13 +37,11 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
     analyserRef.current.getByteFrequencyData(dataArray)
 
-    // Sample 12 evenly-spaced frequency buckets
     const bucketSize = Math.floor(dataArray.length / 12)
     const newBars = Array.from({ length: 12 }, (_, i) => {
       const start = i * bucketSize
       const slice = dataArray.slice(start, start + bucketSize)
       const avg = slice.reduce((a, b) => a + b, 0) / slice.length
-      // Map 0-255 → 3-28px
       return Math.max(3, Math.round((avg / 255) * 28))
     })
 
@@ -60,7 +61,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Set up Web Audio analyser for waveform
       const ctx = new AudioContext()
       const source = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
@@ -69,7 +69,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
       analyserRef.current = analyser
       animFrameRef.current = requestAnimationFrame(animateBars)
 
-      // Choose a supported MIME type
       const mimeType = [
         'audio/webm;codecs=opus',
         'audio/webm',
@@ -86,9 +85,8 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
 
       recorder.onstop = () => submitRecording()
 
-      recorder.start(100) // collect in 100ms chunks
+      recorder.start(100)
 
-      // Duration counter
       timerRef.current = setInterval(() => {
         setDuration(d => {
           if (d + 1 >= MAX_DURATION_MS / 1000) stopRecording()
@@ -128,7 +126,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
 
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
-      // Prevent onstop from firing submission
       recorder.onstop = null
       recorder.stop()
     }
@@ -157,9 +154,16 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
     formData.append('audio', blob, 'recording.webm')
     formData.append('user_id', userId)
 
-    // Optimistic placeholder
+    // FIX: generate a stable tempId and store in ref so submitRecording (called
+    // from recorder.onstop) can pass it back for exact card matching in mergeNote.
+    const tempId = `temp-${crypto.randomUUID()}`
+    tempIdRef.current = tempId
+
+    // FIX: optimistic note now includes all optional Note fields with safe defaults.
+    // Previously missing is_shared/is_discover/share_id/reaction_count caused
+    // undefined renders in the Discover toggle and reaction count display.
     const optimistic: Note = {
-      id: `temp-${crypto.randomUUID()}`,
+      id: tempId,
       user_id: userId,
       raw_content: '🎙️ Transcribing voice note…',
       formatted_content: null,
@@ -169,6 +173,10 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
       image_url: null,
       is_archived: false,
       is_pinned: false,
+      is_shared: false,
+      is_discover: false,
+      share_id: null,
+      reaction_count: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -183,7 +191,9 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
       }
 
       const note: Note = await res.json()
-      onCreate(note) // replace optimistic
+      // FIX: pass _tempId so mergeNote replaces the exact optimistic card,
+      // not just any card matching raw_content (which was always the same placeholder).
+      onCreate({ ...note, _tempId: tempId })
       setState('idle')
       setDuration(0)
     } catch (err) {
@@ -194,7 +204,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
     }
   }
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -214,7 +223,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
   if (state === 'recording') {
     return (
       <div className="flex items-center gap-2">
-        {/* Waveform visualiser */}
         <div className="flex items-end gap-[2px] h-7 px-1" aria-hidden>
           {bars.map((h, i) => (
             <span
@@ -225,12 +233,10 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
           ))}
         </div>
 
-        {/* Duration */}
         <span className="text-xs tabular-nums text-red-500 font-medium min-w-[32px]">
           {formatDuration(duration)}
         </span>
 
-        {/* Cancel */}
         <button
           type="button"
           onClick={cancelRecording}
@@ -240,7 +246,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
           <X size={15} />
         </button>
 
-        {/* Stop / send */}
         <button
           type="button"
           onClick={stopRecording}
@@ -269,7 +274,6 @@ export function VoiceButton({ userId, onCreate, disabled, onRecordingChange }: P
     )
   }
 
-  // idle
   return (
     <button
       type="button"

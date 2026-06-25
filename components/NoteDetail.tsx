@@ -159,7 +159,8 @@ export function NoteDetail({ note, userId, allTags, onClose, onArchive, onRestor
       if (!isShared) {
         const res = await fetch('/api/notes/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note_id: note!.id, action: 'enable' }) })
         const data = await res.json()
-        const url = `${window.location.origin}/shared/${data.share_id}`
+        const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL ?? '')
+        const url = `${origin}/shared/${data.share_id}`
         setShareUrl(url)
         setIsShared(true)
       } else {

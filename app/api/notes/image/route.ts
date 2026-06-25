@@ -9,7 +9,9 @@ async function extractTextFromImage(base64Image: string, mimeType: string): Prom
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      // Migrated from meta-llama/llama-4-scout-17b-16e-instruct (deprecated June 2026, decommissioned July 17 2026)
+      // qwen/qwen3.6-27b is the recommended vision replacement — 20MB file limit, 500 t/s, native multimodal
+      model: 'qwen/qwen3.6-27b',
       messages: [
         {
           role: 'user',

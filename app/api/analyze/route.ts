@@ -86,8 +86,10 @@ STRICT RULES:
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
         },
         body: JSON.stringify({
+          // Migrated from meta-llama/llama-4-scout-17b-16e-instruct (deprecated June 2026, decommissioned July 17 2026)
+          // qwen/qwen3.6-27b is the recommended vision replacement — 20MB file limit, native multimodal
           model: hasImages
-            ? 'meta-llama/llama-4-scout-17b-16e-instruct'
+            ? 'qwen/qwen3.6-27b'
             : 'llama-3.1-8b-instant',
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           max_tokens: 1500,

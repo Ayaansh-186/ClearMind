@@ -6,7 +6,7 @@ import type { Note } from '@/lib/types'
 import { VoiceButton } from '@/components/VoiceButton'
 import { TemplatesModal } from '@/components/TemplatesModal'
 
-type Props = { userId: string; onCreate: (note: Note) => void }
+type Props = { userId: string; onCreate: (note: Note & { _tempId?: string }) => void }
 
 export function CaptureBar({ userId, onCreate }: Props) {
   const [text, setText] = useState('')
@@ -19,8 +19,10 @@ export function CaptureBar({ userId, onCreate }: Props) {
   async function submitText() {
     const raw = text.trim()
     if (!raw || busy) return
+
+    const tempId = `temp-${crypto.randomUUID()}`
     const optimistic: Note = {
-      id: `temp-${crypto.randomUUID()}`,
+      id: tempId,
       user_id: userId,
       raw_content: raw,
       formatted_content: null,
@@ -30,6 +32,13 @@ export function CaptureBar({ userId, onCreate }: Props) {
       image_url: null,
       is_archived: false,
       is_pinned: false,
+      // FIX: include all optional Note fields with safe defaults so downstream
+      // render paths (Discover toggle, share URL, reaction_count display) never
+      // encounter undefined when accessing these on an optimistic card.
+      is_shared: false,
+      is_discover: false,
+      share_id: null,
+      reaction_count: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -43,7 +52,9 @@ export function CaptureBar({ userId, onCreate }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw_content: raw, user_id: userId }),
       })
-      if (res.ok) onCreate(await res.json())
+      // FIX: pass _tempId so mergeNote can find the exact optimistic card by ID
+      // rather than by raw_content (which breaks if you submit the same text twice).
+      if (res.ok) onCreate({ ...await res.json(), _tempId: tempId })
     } finally { setBusy(false); setStatus('') }
   }
 
