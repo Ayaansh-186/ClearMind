@@ -98,7 +98,7 @@ export async function POST(request: Request) {
 
         const { data: notes } = await supabase
           .from('notes')
-          .select('title, raw_content, formatted_content, cluster, created_at')
+          .select('id, title, raw_content, formatted_content, cluster, created_at')
           .in('id', matchedIds)
           .eq('is_archived', false)
 
