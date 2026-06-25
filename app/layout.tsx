@@ -42,10 +42,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Prevent dark mode flash on load */}
+        {/* Anti-flash: read 'clearmind_theme' — must match the key Sidebar.tsx writes */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
-              var theme = localStorage.getItem('theme');
+              var theme = localStorage.getItem('clearmind_theme');
               var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
               if (theme === 'dark' || (!theme && prefersDark)) {
                 document.documentElement.classList.add('dark');

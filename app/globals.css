@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
+/* ── Light mode tokens ──────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  /* Height to clear the fixed mobile bottom nav (+ home-indicator safe area).
-     Used to float the capture bar and AI chat button above it on phones. */
+  /* Core */
+  --background:   #F7F6F3;
+  --foreground:   #18181B;
+
+  /* Cards / surfaces */
+  --card:         #FFFFFF;
+  --card-border:  #E4E4E7;
+
+  /* Sidebar */
+  --sidebar-bg:   #FFFFFF;
+
+  /* Muted text */
+  --muted:        #71717A;
+
+  /* Mobile capture bar / bottom nav clearance */
   --mobile-nav-offset: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
+/* ── Dark mode tokens ───────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background:  #0D0D1A;
+    --foreground:  #F0EFFE;
+    --card:        #13131F;
+    --card-border: #1E1E2E;
+    --sidebar-bg:  #0F0F1C;
+    --muted:       #71717A;
+  }
+}
+
+/* Applied by the anti-flash script in layout.tsx + Sidebar toggleTheme() */
+html.dark {
+  --background:  #0D0D1A;
+  --foreground:  #F0EFFE;
+  --card:        #13131F;
+  --card-border: #1E1E2E;
+  --sidebar-bg:  #0F0F1C;
+  --muted:       #71717A;
+}
+
+/* ── Tailwind v4 theme bridge ───────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ── Base ───────────────────────────────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
@@ -35,4 +64,30 @@ input {
 ::selection {
   background: #d4d4d8;
   color: #18181b;
+}
+
+/* ── Brand wordmark gradient — used as .brand-gradient on <span> ────────────── */
+.brand-gradient {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Card hover lift — used on NoteCard and feature cards ──────────────────── */
+.card-lift {
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.card-lift:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+html.dark .card-lift:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Global focus ring ─────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
 }
