@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { embed, buildNoteText } from '@/lib/embed'
 
 function appUrl(request: NextRequest) {
   return process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin
@@ -32,11 +33,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Fire-and-forget: cluster the note (existing behaviour)
   fetch(`${appUrl(request)}/api/notes/cluster`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ note_id: note.id, content: note.raw_content }),
   }).catch((err) => console.error('CLUSTER ERROR:', err))
+
+  // Fire-and-forget: generate and store the embedding for RAG.
+  // We don't await this — it runs in the background so the user
+  // sees their note immediately. The embedding is ready by the time
+  // they open the chat panel (usually < 1s).
+  ;(async () => {
+    try {
+      const text = buildNoteText({
+        title: note.title,
+        raw_content: note.raw_content,
+        formatted_content: note.formatted_content,
+      })
+      const vector = await embed(text)
+      if (!vector) return
+
+      // Upsert — if the note gets re-embedded (e.g. after AI formats it),
+      // we overwrite the old vector rather than creating a duplicate.
+      const { error: embedError } = await supabase
+        .from('note_embeddings')
+        .upsert({
+          note_id:   note.id,
+          user_id:   note.user_id,
+          embedding: JSON.stringify(vector),
+        }, { onConflict: 'note_id' })
+
+      if (embedError) console.error('EMBED STORE ERROR:', embedError)
+    } catch (err) {
+      console.error('EMBED BACKGROUND ERROR:', err)
+    }
+  })()
 
   return NextResponse.json({ ...note, tags: [] })
 }
