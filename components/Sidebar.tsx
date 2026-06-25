@@ -213,9 +213,12 @@ export function Sidebar({ activeView, activeTagId, tags, counts, email, onChange
       {/* Mobile More sheet */}
       {showMore && (
         <>
-          <div className="fixed inset-0 z-50 bg-zinc-950/40 backdrop-blur-[2px] md:hidden" onClick={() => setShowMore(false)} />
-          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl p-5 shadow-2xl md:hidden" style={{ background: 'var(--sidebar-bg)', borderTop: '1px solid var(--card-border)', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-            <div className="mb-5 flex items-center justify-between">
+          {/* z-[60]: above bottom nav (z-40), below sheet */}
+          <div className="fixed inset-0 z-[60] bg-zinc-950/50 backdrop-blur-[2px] md:hidden" onClick={() => setShowMore(false)} />
+          {/* z-[61]: topmost layer. flex-col so header + scroll + footer stack cleanly */}
+          <div className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[88vh] flex-col rounded-t-3xl shadow-2xl md:hidden" style={{ background: 'var(--sidebar-bg)', borderTop: '1px solid var(--card-border)' }}>
+            {/* ── Non-scrolling header ── */}
+            <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
                   <Sparkles size={17} className="text-white" />
@@ -232,65 +235,69 @@ export function Sidebar({ activeView, activeTagId, tags, counts, email, onChange
               </div>
             </div>
 
-            {/* Discover */}
-            <button onClick={() => { setShowMore(false); router.push('/discover') }}
-              className="mb-4 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 transition"
-              style={{ background: 'rgba(99,102,241,0.08)' }}>
-              <Compass size={18} /> Discover Community Notes
-            </button>
+            {/* ── Scrollable body ── */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
+              {/* Discover */}
+              <button onClick={() => { setShowMore(false); router.push('/discover') }}
+                className="mb-4 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 transition"
+                style={{ background: 'rgba(99,102,241,0.08)' }}>
+                <Compass size={18} /> Discover Community Notes
+              </button>
 
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Clusters</div>
-            <nav className="mb-5 space-y-0.5">
-              {defaultClusters.map(cluster => (
-                <button key={cluster} onClick={() => { onChangeView(cluster); setShowMore(false) }} className={itemClass(cluster)}>
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: clusterColors[cluster].dot }} />
-                  <span className="min-w-0 flex-1 truncate text-left capitalize">{cluster}</span>
-                  <span className="text-xs opacity-50">{counts[cluster] ?? 0}</span>
-                </button>
-              ))}
-            </nav>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Clusters</div>
+              <nav className="mb-5 space-y-0.5">
+                {defaultClusters.map(cluster => (
+                  <button key={cluster} onClick={() => { onChangeView(cluster); setShowMore(false) }} className={itemClass(cluster)}>
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: clusterColors[cluster].dot }} />
+                    <span className="min-w-0 flex-1 truncate text-left capitalize">{cluster}</span>
+                    <span className="text-xs opacity-50">{counts[cluster] ?? 0}</span>
+                  </button>
+                ))}
+              </nav>
 
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Tags</span>
-              <button onClick={() => setShowAddTag(v => !v)} className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:text-indigo-500 transition"><Plus size={14} /></button>
-            </div>
-            {showAddTag && (
-              <div className="mb-2 flex gap-1">
-                <input value={newTagName} onChange={e => setNewTagName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') submitNewTag() }}
-                  placeholder="Tag name..." className="flex-1 rounded-lg border px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
-                  style={{ borderColor: 'var(--card-border)', background: 'var(--background)' }} />
-                <button onClick={submitNewTag} disabled={!newTagName.trim()} className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs text-white disabled:opacity-40">Add</button>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Tags</span>
+                <button onClick={() => setShowAddTag(v => !v)} className="flex h-6 w-6 items-center justify-center rounded-lg text-zinc-400 hover:text-indigo-500 transition"><Plus size={14} /></button>
               </div>
-            )}
-            <nav className="mb-5 space-y-0.5">
-              {tags.length === 0 && <p className="px-3 py-2 text-xs text-zinc-400">No tags yet</p>}
-              {tags.map(tag => (
-                <button key={tag.id} onClick={() => { onChangeTag(activeTagId === tag.id ? null : tag.id); setShowMore(false) }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${activeTagId === tag.id ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'}`}>
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                  <span className="min-w-0 flex-1 truncate text-left">{tag.name}</span>
-                </button>
-              ))}
-            </nav>
+              {showAddTag && (
+                <div className="mb-2 flex gap-1">
+                  <input value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') submitNewTag() }}
+                    placeholder="Tag name..." className="flex-1 rounded-lg border px-2 py-1.5 text-xs outline-none focus:border-indigo-400"
+                    style={{ borderColor: 'var(--card-border)', background: 'var(--background)' }} />
+                  <button onClick={submitNewTag} disabled={!newTagName.trim()} className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs text-white disabled:opacity-40">Add</button>
+                </div>
+              )}
+              <nav className="mb-5 space-y-0.5">
+                {tags.length === 0 && <p className="px-3 py-2 text-xs text-zinc-400">No tags yet</p>}
+                {tags.map(tag => (
+                  <button key={tag.id} onClick={() => { onChangeTag(activeTagId === tag.id ? null : tag.id); setShowMore(false) }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${activeTagId === tag.id ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'}`}>
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                    <span className="min-w-0 flex-1 truncate text-left">{tag.name}</span>
+                  </button>
+                ))}
+              </nav>
 
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Tools</div>
-            <nav className="mb-5 space-y-0.5">
-              {[
-                { label: 'Analyzer', icon: BarChart2, path: '/analyze' },
-                { label: 'Chapter Notes', icon: BookOpen, path: '/chapter-notes' },
-                { label: 'Knowledge Graph', icon: Network, path: '/graph' },
-                { label: 'Weekly Digest', icon: CalendarDays, path: '/digest' },
-              ].map(t => (
-                <button key={t.path} onClick={() => { setShowMore(false); router.push(t.path) }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60 transition">
-                  <t.icon size={17} /><span className="flex-1 text-left">{t.label}</span>
-                </button>
-              ))}
-            </nav>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Tools</div>
+              <nav className="space-y-0.5">
+                {[
+                  { label: 'Analyzer', icon: BarChart2, path: '/analyze' },
+                  { label: 'Chapter Notes', icon: BookOpen, path: '/chapter-notes' },
+                  { label: 'Knowledge Graph', icon: Network, path: '/graph' },
+                  { label: 'Weekly Digest', icon: CalendarDays, path: '/digest' },
+                ].map(t => (
+                  <button key={t.path} onClick={() => { setShowMore(false); router.push(t.path) }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60 transition">
+                    <t.icon size={17} /><span className="flex-1 text-left">{t.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-            <div className="rounded-2xl p-3" style={{ background: 'var(--background)' }}>
-              <div className="flex items-center gap-3">
+            {/* ── Sticky footer with safe-area ── */}
+            <div className="shrink-0 border-t px-5 py-3" style={{ borderColor: 'var(--card-border)', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+              <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: 'var(--background)' }}>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
                   {email[0]?.toUpperCase() ?? 'U'}
                 </div>

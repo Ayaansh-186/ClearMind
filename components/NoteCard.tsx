@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { Pin, CheckCircle2, Circle } from 'lucide-react'
 import { clusterColors, type Note } from '@/lib/types'
 import { TagChips } from '@/components/TagPicker'
@@ -27,7 +28,11 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
   const isProcessing = !note.title
 
   function handleClick(e: React.MouseEvent) {
-    if (selectable || onSelect) { e.preventDefault(); onSelect?.(note); return }
+    // On mobile, a long-press fires onSelect then immediately triggers a click.
+    // Bail out here so the note doesn't also open after a long-press select.
+    if (longPressed.current) { longPressed.current = false; return }
+    // In select mode, tapping a card toggles selection instead of opening it.
+    if (selectable) { e.preventDefault(); onSelect?.(note); return }
     onOpen(note)
   }
 
@@ -36,9 +41,23 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
     onTogglePin?.(note)
   }
 
-  let pressTimer: ReturnType<typeof setTimeout> | null = null
-  function onTouchStart() { pressTimer = setTimeout(() => onSelect?.(note), 500) }
-  function onTouchEnd() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null } }
+  // ── Long-press to enter select mode (mobile only) ──────────────────────────
+  // longPressed ref blocks the click that fires after touchend, so a long-press
+  // enters select mode without also opening the note.
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressed = useRef(false)
+
+  function onTouchStart() {
+    longPressed.current = false
+    pressTimer.current = setTimeout(() => {
+      longPressed.current = true
+      onSelect?.(note)
+    }, 500)
+  }
+
+  function onTouchEnd() {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+  }
 
   return (
     <button
