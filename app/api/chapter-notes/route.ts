@@ -69,7 +69,7 @@ ${totalChunks > 1 ? `Part ${chunkIndex + 1} of ${totalChunks}. ${isFirstChunk ? 
 
   try {
     const notes = await callGroqWithRetry({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Create study notes from this content:\n\n${textContent}` }

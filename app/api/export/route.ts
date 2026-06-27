@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       ...sections.flatMap(s => [s, '\n---\n']),
     ].join('\n')
 
-    const filename = `clarity-export-${new Date().toISOString().slice(0, 10)}.${format}`
+    const filename = `clearmind-export-${new Date().toISOString().slice(0, 10)}.${format}`
     const mimeType = format === 'md' ? 'text/markdown' : 'text/plain'
 
     return new NextResponse(combined, {

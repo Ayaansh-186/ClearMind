@@ -1,26 +1,17 @@
 @import "tailwindcss";
 
-/* ── Light mode tokens ──────────────────────────────────────────────────────── */
+/* ── Light mode ─────────────────────────────────────────────────────────────── */
 :root {
-  /* Core */
-  --background:   #F7F6F3;
-  --foreground:   #18181B;
-
-  /* Cards / surfaces */
-  --card:         #FFFFFF;
-  --card-border:  #E4E4E7;
-
-  /* Sidebar */
-  --sidebar-bg:   #FFFFFF;
-
-  /* Muted text */
-  --muted:        #71717A;
-
-  /* Mobile capture bar / bottom nav clearance */
+  --background:        #F7F6F3;
+  --foreground:        #18181B;
+  --card:              #FFFFFF;
+  --card-border:       #E4E4E7;
+  --sidebar-bg:        #FFFFFF;
+  --muted:             #71717A;
   --mobile-nav-offset: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
-/* ── Dark mode tokens ───────────────────────────────────────────────────────── */
+/* ── Dark mode (system preference) ─────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root {
     --background:  #0D0D1A;
@@ -32,7 +23,7 @@
   }
 }
 
-/* Applied by the anti-flash script in layout.tsx + Sidebar toggleTheme() */
+/* ── Dark mode (toggled via class) ─────────────────────────────────────────── */
 html.dark {
   --background:  #0D0D1A;
   --foreground:  #F0EFFE;
@@ -42,7 +33,7 @@ html.dark {
   --muted:       #71717A;
 }
 
-/* ── Tailwind v4 theme bridge ───────────────────────────────────────────────── */
+/* ── Tailwind v4 bridge ─────────────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -56,17 +47,11 @@ body {
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
 }
 
-button,
-input {
-  font: inherit;
-}
+button, input { font: inherit; }
 
-::selection {
-  background: #d4d4d8;
-  color: #18181b;
-}
+::selection { background: #d4d4d8; color: #18181b; }
 
-/* ── Brand wordmark gradient — used as .brand-gradient on <span> ────────────── */
+/* ── Brand wordmark gradient ────────────────────────────────────────────────── */
 .brand-gradient {
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   -webkit-background-clip: text;
@@ -74,7 +59,7 @@ input {
   background-clip: text;
 }
 
-/* ── Card hover lift — used on NoteCard and feature cards ──────────────────── */
+/* ── Card hover lift ────────────────────────────────────────────────────────── */
 .card-lift {
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
@@ -86,7 +71,7 @@ html.dark .card-lift:hover {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* ── Global focus ring ─────────────────────────────────────────────────────── */
+/* ── Global focus ring ──────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: 2px;

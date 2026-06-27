@@ -15,7 +15,7 @@ async function callGroq(systemPrompt: string, userPrompt: string): Promise<strin
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -37,12 +37,17 @@ export async function POST(request: Request) {
 
   try {
     const text = await callGroq(
-      'You are a notes organizer. Return ONLY a valid JSON object with no markdown, no explanation, no backticks.',
-      `Given this note, return exactly: {"cluster":"work","title":"short title max 8 words","relevance":7}
-cluster must be one of: work, ideas, personal, learning, health
-relevance is 1-10 based on how urgent or actionable the note seems.
+      'You are a notes organizer. Return ONLY a valid JSON object with no markdown, no explanation, no backticks. The title field must be a real descriptive title, never a placeholder or instruction.',
+      `Analyze this note and return exactly this JSON shape:
+{"cluster":"work","title":"Descriptive Note Title","relevance":7}
 
-Note: ${content}`
+Rules:
+- cluster must be one of: work, ideas, personal, learning, health
+- title must be a real, specific title for this note (max 8 words, no quotes around it)
+- relevance is 1-10 based on how urgent or actionable the note is
+
+Note content:
+${content}`
     )
 
     const parsed = safeJson(text)

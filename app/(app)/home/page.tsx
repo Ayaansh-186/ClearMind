@@ -9,6 +9,7 @@ import { CaptureBar } from '@/components/CaptureBar'
 import { ChatPanel } from '@/components/ChatPanel'
 import { CommandPalette } from '@/components/CommandPalette'
 import { DueRemindersBanner } from '@/components/DueRemindersBanner'
+import { ThoughtEngine } from '@/components/ThoughtEngine'
 import { InstallBanner } from '@/components/InstallBanner'
 import { NoteCard } from '@/components/NoteCard'
 import { NoteDetail } from '@/components/NoteDetail'
@@ -106,15 +107,12 @@ export default function Home() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    // FIX: was "clarity-export" — updated to match rebranded name
     a.download = `clearmind-export-${new Date().toISOString().slice(0, 10)}.${format}`
     a.click()
     URL.revokeObjectURL(url)
     clearSelection()
   }
-
   const [cmdOpen, setCmdOpen] = useState(false)
-  // FIX: start empty string to avoid ⌘K → Ctrl+K hydration flash on Windows
   const [kbdHint, setKbdHint] = useState('')
 
   useEffect(() => {
@@ -179,6 +177,7 @@ export default function Home() {
       setUser(u)
       fetchNotes(activeView, u.id)
       fetchTags(u.id)
+      // Initial reminder fetch
       fetchDueReminders(u.id)
     })
   }, [router])
@@ -207,18 +206,13 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // FIX: was 3000ms (every 3s) — extremely aggressive, burning Supabase quota
-  // at ~40 req/min/user. Now 30s. New notes appear immediately via mergeNote()
-  // on capture, so the background poll is just a safety net for multi-device sync.
   useEffect(() => {
     if (!user) return
     const interval = setInterval(() => fetchNotes(), 30_000)
     return () => clearInterval(interval)
   }, [fetchNotes, user])
 
-  // FIX: removed redundant activeTagId useEffect that caused a double fetch.
-  // Tag changes are now handled exclusively in changeTag() below, which calls
-  // fetchNotes directly with the new tagId — no stale-closure risk.
+  // Tag changes trigger fetchNotes directly via changeTag() below — no useEffect needed
 
   const counts = useMemo(() => {
     const result: Record<string, number> = {
@@ -233,9 +227,6 @@ export default function Home() {
     return result
   }, [allNotes])
 
-  // FIX: mergeNote now accepts an optional _tempId field so CaptureBar and
-  // VoiceButton can pass the temp card's exact ID for reliable removal.
-  // Falls back to raw_content matching for backwards compatibility.
   function mergeNote(note: Note & { _tempId?: string }) {
     const tempId = note._tempId
     const clean: Note = { ...note }
@@ -246,18 +237,14 @@ export default function Home() {
         ? curr.filter(n => n.id !== tempId)
         : curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
       const exists = withoutTemp.some(n => n.id === clean.id)
-      return exists
-        ? withoutTemp.map(n => n.id === clean.id ? { ...n, ...clean } : n)
-        : [clean, ...withoutTemp]
+      return exists ? withoutTemp.map(n => n.id === clean.id ? { ...n, ...clean } : n) : [clean, ...withoutTemp]
     })
     setAllNotes(curr => {
       const withoutTemp = tempId
         ? curr.filter(n => n.id !== tempId)
         : curr.filter(n => !(n.id.startsWith('temp-') && n.raw_content === note.raw_content))
       const exists = withoutTemp.some(n => n.id === clean.id)
-      return exists
-        ? withoutTemp.map(n => n.id === clean.id ? { ...n, ...clean } : n)
-        : [clean, ...withoutTemp]
+      return exists ? withoutTemp.map(n => n.id === clean.id ? { ...n, ...clean } : n) : [clean, ...withoutTemp]
     })
   }
 
@@ -266,10 +253,12 @@ export default function Home() {
     completeOnboarding()
   }
 
+  // ── Tag handlers ─────────────────────────────────────────────────────────
   async function fetchDueReminders(uid: string) {
     const res = await fetch(`/api/reminders?user_id=${uid}`)
     if (!res.ok) return
     const all: Array<{ id: string; remind_at: string; note_id: string; label?: string | null; notes: { id: string; title: string | null; raw_content: string } | null }> = await res.json()
+    // Show only reminders that are due or overdue
     const now = Date.now()
     setDueReminders(all.filter(r => new Date(r.remind_at).getTime() <= now))
   }
@@ -284,6 +273,7 @@ export default function Home() {
     if (note) setSelected(note)
   }
 
+  // ── Tag handlers ─────────────────────────────────────────────────────────
   async function createTag(name: string) {
     if (!user) return
     const res = await fetch('/api/tags', {
@@ -301,6 +291,7 @@ export default function Home() {
     setTags(curr => curr.filter(t => t.id !== tagId))
     if (activeTagId === tagId) setActiveTagId(null)
     await fetch(`/api/tags/${tagId}`, { method: 'DELETE' })
+    // Notes may have lost a tag — refresh to keep chips accurate
     fetchNotes()
   }
 
@@ -311,6 +302,7 @@ export default function Home() {
   async function togglePin(note: Note) {
     const nextPinned = !note.is_pinned
 
+    // Optimistic update
     setNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
     setAllNotes(curr => curr.map(n => n.id === note.id ? { ...n, is_pinned: nextPinned } : n))
     setSelected(curr => curr?.id === note.id ? { ...curr, is_pinned: nextPinned } : curr)
@@ -384,6 +376,8 @@ export default function Home() {
     })
   }, [searchQuery, notes, allNotes, activeView, activeTagId])
 
+  // Split into pinned / unpinned. Pinned section is hidden in the archived view
+  // (archived notes shouldn't clutter a "pinned" shelf) and while searching.
   const showPinnedSection = activeView !== 'archived' && !searchQuery.trim()
   const pinnedNotes = showPinnedSection ? displayedNotes.filter(n => n.is_pinned) : []
   const unpinnedNotes = showPinnedSection ? displayedNotes.filter(n => !n.is_pinned) : displayedNotes
@@ -393,8 +387,6 @@ export default function Home() {
     fetchNotes(view, undefined, activeTagId)
   }
 
-  // FIX: changeTag now explicitly calls fetchNotes with the new tagId, replacing
-  // the removed useEffect watcher. This avoids the stale-closure double-fetch bug.
   function changeTag(tagId: string | null) {
     setActiveTagId(tagId)
     if (user) fetchNotes(activeView, user.id, tagId)
@@ -408,6 +400,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white text-zinc-950 md:pl-[260px] dark:bg-zinc-950 dark:text-zinc-50">
+      {/* Bulk action bar — replaces header when notes are selected */}
       {inSelectMode && (
         <BulkActionBar
           count={selectedIds.size}
@@ -461,16 +454,13 @@ export default function Home() {
                   </button>
                 )}
               </div>
-              {/* FIX: only render after mount to avoid hydration flash (⌘K vs Ctrl+K) */}
-              {kbdHint && (
-                <button
-                  onClick={() => setCmdOpen(true)}
-                  className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-xs text-zinc-500 hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 sm:flex transition"
-                  title={`Open command palette (${kbdHint})`}
-                >
-                  <span>{kbdHint}</span>
-                </button>
-              )}
+              <button
+                onClick={() => setCmdOpen(true)}
+                className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-xs text-zinc-500 hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 sm:flex transition"
+                title="Open command palette (⌘K / Ctrl+K)"
+              >
+                <span>{kbdHint}</span>
+              </button>
             </div>
           </div>
         </header>
@@ -501,6 +491,7 @@ export default function Home() {
               </div>
             ) : (
               <>
+                {/* Pinned section */}
                 {pinnedNotes.length > 0 && (
                   <div className="mb-8">
                     <div className="mb-3 flex items-center gap-2">
@@ -526,6 +517,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* Everything else */}
                 {unpinnedNotes.length > 0 && (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {unpinnedNotes.map(note => (
@@ -556,7 +548,16 @@ export default function Home() {
         onReminderChanged={() => user && fetchDueReminders(user.id)}
       />
       <ChatPanel userId={user.id} activeNote={selected} />
+      <ThoughtEngine
+        userId={user.id}
+        onCreate={mergeNote}
+        onOpenNote={id => {
+          const note = allNotes.find(n => n.id === id)
+          if (note) setSelected(note)
+        }}
+      />
 
+      {/* Command Palette */}
       {cmdOpen && (
         <CommandPalette
           notes={allNotes.filter(n => !n.is_archived)}
@@ -566,6 +567,7 @@ export default function Home() {
         />
       )}
 
+      {/* Onboarding modal — only shown to first-time users */}
       {showOnboarding && (
         <OnboardingModal
           userId={user.id}

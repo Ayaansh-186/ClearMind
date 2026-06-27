@@ -5,46 +5,52 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://clarity-delta-two.ve
 
 export const metadata: Metadata = {
   title: 'Notion Alternative — ClearMind | AI Notes That Organise Themselves',
-  description: 'Looking for a Notion alternative? ClearMind is an AI-powered notes app that organises your thoughts automatically — no databases, no templates, no setup. Free.',
+  description: 'Looking for a Notion alternative? ClearMind is an AI-powered notes app that organises your thoughts automatically — built for personal knowledge capture, not team wikis. Free.',
   alternates: { canonical: `${siteUrl}/notion-alternative` },
   openGraph: {
     title: 'Notion Alternative — ClearMind | AI Notes That Organise Themselves',
-    description: 'ClearMind is the Notion alternative built for people who want AI to do the organising. No setup. No templates. Just capture and go.',
+    description: 'ClearMind is the AI-first alternative for personal note capture. No databases, no templates, no setup required.',
     url: `${siteUrl}/notion-alternative`,
     type: 'website',
   },
 }
 
-const differences = [
+const comparisons = [
   {
-    aspect: 'Setup time',
-    notion: 'Hours of template building, database design, and property setup before you can start.',
-    clearmind: 'Zero. Sign up, type a thought, AI organises it. You\'re done in 30 seconds.',
+    feature: 'Note organisation',
+    clearmind: 'AI-automatic — every note is clustered, titled, and formatted on save with no input from you',
+    notion: 'User-driven — you design the structure, databases, and views yourself',
+    obsidian: 'Manual by default — you create links and folders; AI features available via plugins',
   },
   {
-    aspect: 'Organisation',
-    notion: 'You build the structure. Databases, views, tags, relations — all manual.',
-    clearmind: 'AI builds the structure. Every note is automatically titled, formatted, and clustered.',
+    feature: 'AI capabilities',
+    clearmind: 'Core to every note: auto-formatting, auto-clustering, semantic search, AI chat over your notes',
+    notion: 'Notion AI assists with writing, summarising, and answering questions about your workspace',
+    obsidian: 'Customisable via community plugins; base app focuses on local-first knowledge linking',
   },
   {
-    aspect: 'Voice capture',
-    notion: 'No built-in voice transcription.',
-    clearmind: 'Record voice from the capture bar. Whisper AI transcribes and formats it instantly.',
+    feature: 'Setup required',
+    clearmind: 'Zero — sign up, type a thought, done',
+    notion: 'Moderate — best experienced after setting up databases, templates, and page structure',
+    obsidian: 'High — vault setup, plugin configuration, and linking conventions take time',
   },
   {
-    aspect: 'Finding old ideas',
-    notion: 'Search by keyword. Relies on you having tagged and organised things correctly.',
-    clearmind: 'Semantic AI search finds ideas by meaning, not just keywords. Ask a question, get your note.',
+    feature: 'Voice capture',
+    clearmind: 'Built-in — record audio, Whisper AI transcribes and formats it instantly',
+    notion: 'Not built-in natively',
+    obsidian: 'Available via plugins',
   },
   {
-    aspect: 'Learning curve',
-    notion: 'Steep. Notion is powerful but complex — most users use 10% of its features.',
-    clearmind: 'None. Capture bar at the bottom. Type. Done.',
+    feature: 'Note connections',
+    clearmind: 'Automatic — AI finds semantically related notes and surfaces them without any linking',
+    notion: 'Manual relations and backlinks; AI can help find connections within your workspace',
+    obsidian: 'Manual backlinks and graph view are core features — powerful but requires intentional linking',
   },
   {
-    aspect: 'Price',
-    notion: 'Free plan is limited. Plus is $10/month.',
-    clearmind: 'Free. Fully featured.',
+    feature: 'Best for',
+    clearmind: 'Personal knowledge capture where you want AI to handle all the organising',
+    notion: 'Teams, project management, wikis, and structured databases with flexible views',
+    obsidian: 'Researchers and writers who want full control over a local, privacy-first knowledge base',
   },
 ]
 
@@ -72,60 +78,87 @@ export default function NotionAlternative() {
 
         <div className="mb-16 text-center">
           <div className="mb-4 inline-flex rounded-full px-4 py-1.5 text-xs font-semibold" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#6366f1' }}>
-            Notion Alternative
+            Comparison
           </div>
           <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">
-            The Notion alternative<br /><span className="brand-gradient">that thinks for itself</span>
+            ClearMind vs Notion<br /><span className="brand-gradient">vs Obsidian</span>
           </h1>
           <p className="mx-auto max-w-xl text-base leading-relaxed" style={{ color: 'var(--muted)' }}>
-            Notion is a great tool — for teams building wikis and project trackers. But if you want a place to capture personal knowledge and have it stay organised, ClearMind does that with zero setup and real AI.
+            Notion, Obsidian, and ClearMind are all excellent tools — they just solve different problems. Here's an honest breakdown to help you pick the right one.
           </p>
-          <div className="mt-8 flex justify-center gap-3">
-            <Link href="/login" className="rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-lg" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-              Try ClearMind free
-            </Link>
-            <Link href="/how-it-works" className="rounded-xl px-6 py-3 text-sm font-medium" style={{ border: '1px solid var(--card-border)', color: 'var(--muted)' }}>
-              See how it works →
-            </Link>
-          </div>
         </div>
 
+        {/* Comparison table */}
         <section className="mb-14">
-          <h2 className="mb-8 text-2xl font-bold tracking-tight">ClearMind vs Notion</h2>
-          <div className="space-y-4">
-            {differences.map(d => (
-              <div key={d.aspect} className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--card-border)' }}>
-                <div className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest" style={{ background: 'var(--card)', color: 'var(--muted)', borderBottom: '1px solid var(--card-border)' }}>
-                  {d.aspect}
+          <div className="overflow-hidden rounded-2xl" style={{ border: '1px solid var(--card-border)' }}>
+            {/* Header */}
+            <div className="grid grid-cols-4 text-xs font-bold uppercase tracking-widest" style={{ background: 'var(--card)', borderBottom: '1px solid var(--card-border)' }}>
+              <div className="px-5 py-3" style={{ color: 'var(--muted)' }}>Feature</div>
+              <div className="px-4 py-3" style={{ color: '#6366f1' }}>ClearMind</div>
+              <div className="px-4 py-3" style={{ color: 'var(--muted)' }}>Notion</div>
+              <div className="px-4 py-3" style={{ color: 'var(--muted)' }}>Obsidian</div>
+            </div>
+
+            {comparisons.map((row, i) => (
+              <div key={row.feature} className="grid grid-cols-4" style={{ borderTop: i > 0 ? '1px solid var(--card-border)' : undefined }}>
+                <div className="px-5 py-4 text-xs font-semibold" style={{ color: 'var(--foreground)', background: 'var(--card)' }}>
+                  {row.feature}
                 </div>
-                <div className="grid sm:grid-cols-2">
-                  <div className="p-5" style={{ borderRight: '1px solid var(--card-border)' }}>
-                    <div className="mb-2 text-xs font-semibold text-zinc-400">Notion</div>
-                    <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{d.notion}</p>
-                  </div>
-                  <div className="p-5" style={{ background: 'rgba(99,102,241,0.03)' }}>
-                    <div className="mb-2 text-xs font-semibold" style={{ color: '#6366f1' }}>ClearMind</div>
-                    <p className="text-sm leading-relaxed">{d.clearmind}</p>
-                  </div>
+                <div className="px-4 py-4 text-xs leading-relaxed" style={{ background: 'rgba(99,102,241,0.03)', color: 'var(--foreground)' }}>
+                  {row.clearmind}
                 </div>
+                <div className="px-4 py-4 text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>
+                  {row.notion}
+                </div>
+                <div className="px-4 py-4 text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>
+                  {row.obsidian}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-center text-xs" style={{ color: 'var(--muted)' }}>
+            All three are capable tools. This comparison reflects their core design philosophy, not a ranking.
+          </p>
+        </section>
+
+        {/* When each is the right choice */}
+        <section className="mb-14">
+          <h2 className="mb-6 text-2xl font-bold tracking-tight">When to use each tool</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                name: 'ClearMind',
+                color: '#6366f1',
+                when: 'You want to capture personal knowledge fast and have AI handle all the structure. Minimal setup, maximum automation.',
+                emoji: '✦',
+              },
+              {
+                name: 'Notion',
+                color: '#18181B',
+                when: 'You need a team workspace, project tracker, or structured database. Great for collaborative wikis and flexible views.',
+                emoji: '📋',
+              },
+              {
+                name: 'Obsidian',
+                color: '#7C3AED',
+                when: 'You want a private, local-first knowledge base with full control. Perfect for researchers and writers who prefer manual linking.',
+                emoji: '🔮',
+              },
+            ].map(t => (
+              <div key={t.name} className="rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-xl">{t.emoji}</span>
+                  <span className="text-sm font-bold" style={{ color: t.color }}>{t.name}</span>
+                </div>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{t.when}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="mb-14 rounded-2xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--card-border)' }}>
-          <h2 className="mb-3 text-lg font-bold">When Notion is the right choice</h2>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-            Notion is genuinely powerful for collaborative team wikis, project management with multiple views, and structured databases with complex relations. If you need those things, use Notion.
-          </p>
-          <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-            ClearMind is for personal knowledge capture where you want AI to handle all the organising — and you want zero friction between having a thought and saving it.
-          </p>
-        </section>
-
         <div className="rounded-3xl p-10 text-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-          <h2 className="mb-3 text-2xl font-bold text-white">Switch to the Notion alternative that organises itself</h2>
-          <p className="mb-6 text-sm text-indigo-200">Free forever. No setup. No templates needed.</p>
+          <h2 className="mb-3 text-2xl font-bold text-white">Try ClearMind free</h2>
+          <p className="mb-6 text-sm text-indigo-200">AI-first personal notes. No setup. No templates needed.</p>
           <Link href="/login" className="inline-flex rounded-xl bg-white px-7 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-50 transition">
             Get started free →
           </Link>

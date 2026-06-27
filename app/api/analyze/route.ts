@@ -90,7 +90,7 @@ STRICT RULES:
           // qwen/qwen3.6-27b is the recommended vision replacement — 20MB file limit, native multimodal
           model: hasImages
             ? 'qwen/qwen3.6-27b'
-            : 'llama-3.1-8b-instant',
+            : 'openai/gpt-oss-20b',
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           max_tokens: 1500,
           temperature: 0.1,
@@ -110,7 +110,7 @@ STRICT RULES:
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           max_tokens: 800,
           temperature: 0.2,

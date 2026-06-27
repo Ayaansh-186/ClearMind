@@ -27,23 +27,11 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
   const colors = note.cluster ? clusterColors[note.cluster] : null
   const isProcessing = !note.title
 
-  function handleClick(e: React.MouseEvent) {
-    // On mobile, a long-press fires onSelect then immediately triggers a click.
-    // Bail out here so the note doesn't also open after a long-press select.
-    if (longPressed.current) { longPressed.current = false; return }
-    // In select mode, tapping a card toggles selection instead of opening it.
-    if (selectable) { e.preventDefault(); onSelect?.(note); return }
-    onOpen(note)
-  }
-
   function handlePinClick(e: React.MouseEvent) {
     e.stopPropagation()
     onTogglePin?.(note)
   }
 
-  // ── Long-press to enter select mode (mobile only) ──────────────────────────
-  // longPressed ref blocks the click that fires after touchend, so a long-press
-  // enters select mode without also opening the note.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressed = useRef(false)
 
@@ -57,6 +45,12 @@ export function NoteCard({ note, onOpen, onTogglePin, selectable, selected, onSe
 
   function onTouchEnd() {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    if (longPressed.current) { longPressed.current = false; return }
+    if (selectable) { e.preventDefault(); onSelect?.(note); return }
+    onOpen(note)
   }
 
   return (

@@ -1,14 +1,25 @@
 // scripts/backfill-embeddings.mjs
-//
-// One-time script to generate embeddings for all existing notes.
-// Run ONCE after deploying the RAG code changes:
-//
-//   node scripts/backfill-embeddings.mjs
-//
-// Requires these env vars (same as your .env.local):
-//   NEXT_PUBLIC_SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
-//   GROQ_API_KEY
+import { createRequire } from 'module'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// Load .env.local manually (dotenv may not be installed, so we parse it ourselves)
+try {
+  const envPath = resolve(process.cwd(), '.env.local')
+  const lines = readFileSync(envPath, 'utf8').split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx === -1) continue
+    const key = trimmed.slice(0, eqIdx).trim()
+    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '')
+    if (key && !process.env[key]) process.env[key] = val
+  }
+  console.log('✅ Loaded .env.local')
+} catch {
+  console.warn('⚠️  Could not load .env.local — make sure env vars are set manually')
+}
 
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
@@ -43,12 +54,26 @@ async function main() {
   console.log('🔍 Finding notes without embeddings...')
 
   // Fetch all notes that don't have an embedding yet
-  const { data: notes, error } = await supabase
+  // Fetch IDs that already have embeddings
+  const { data: existing } = await supabase
+    .from('note_embeddings')
+    .select('note_id')
+
+  const embeddedIds = (existing ?? []).map(r => r.note_id)
+
+  // Fetch all non-archived notes
+  let query = supabase
     .from('notes')
     .select('id, user_id, title, raw_content, formatted_content')
     .eq('is_archived', false)
-    .not('id', 'in', `(select note_id from note_embeddings)`)
     .order('created_at', { ascending: false })
+
+  // Exclude already-embedded notes (if any exist)
+  if (embeddedIds.length > 0) {
+    query = query.not('id', 'in', `(${embeddedIds.map(id => `"${id}"`).join(',')})`)
+  }
+
+  const { data: notes, error } = await query
 
   if (error) {
     console.error('Failed to fetch notes:', error)

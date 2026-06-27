@@ -8,7 +8,7 @@ async function callGroqWithRetry(messages: object[], systemPrompt: string, maxTo
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
         max_tokens: maxTokens,
         temperature: 0.4,
