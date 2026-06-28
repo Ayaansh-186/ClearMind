@@ -6,7 +6,7 @@ import type { Note } from '@/lib/types'
 import { VoiceButton } from '@/components/VoiceButton'
 import { TemplatesModal } from '@/components/TemplatesModal'
 
-type Props = { userId: string; onCreate: (note: Note & { _tempId?: string }) => void }
+type Props = { userId: string; onCreate: (note: Note) => void }
 
 export function CaptureBar({ userId, onCreate }: Props) {
   const [text, setText] = useState('')
@@ -15,14 +15,13 @@ export function CaptureBar({ userId, onCreate }: Props) {
   const [recording, setRecording] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
 
   async function submitText() {
     const raw = text.trim()
     if (!raw || busy) return
-
-    const tempId = `temp-${crypto.randomUUID()}`
     const optimistic: Note = {
-      id: tempId,
+      id: `temp-${crypto.randomUUID()}`,
       user_id: userId,
       raw_content: raw,
       formatted_content: null,
@@ -32,13 +31,6 @@ export function CaptureBar({ userId, onCreate }: Props) {
       image_url: null,
       is_archived: false,
       is_pinned: false,
-      // FIX: include all optional Note fields with safe defaults so downstream
-      // render paths (Discover toggle, share URL, reaction_count display) never
-      // encounter undefined when accessing these on an optimistic card.
-      is_shared: false,
-      is_discover: false,
-      share_id: null,
-      reaction_count: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -52,9 +44,7 @@ export function CaptureBar({ userId, onCreate }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw_content: raw, user_id: userId }),
       })
-      // FIX: pass _tempId so mergeNote can find the exact optimistic card by ID
-      // rather than by raw_content (which breaks if you submit the same text twice).
-      if (res.ok) onCreate({ ...await res.json(), _tempId: tempId })
+      if (res.ok) onCreate(await res.json())
     } finally { setBusy(false); setStatus('') }
   }
 
@@ -97,9 +87,16 @@ export function CaptureBar({ userId, onCreate }: Props) {
               <LayoutTemplate size={18} />
             </button>
 
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+            <button type="button"
+              onClick={() => {
+                // On mobile use camera capture; on desktop open file picker
+                const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent)
+                if (isMobileDevice) cameraRef.current?.click()
+                else fileRef.current?.click()
+              }}
+              disabled={busy}
               className={`${recording ? 'hidden sm:flex' : 'flex'} h-10 w-10 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 disabled:opacity-40`}
-              title="Upload image">
+              title="Upload image or take photo">
               <Camera size={18} />
             </button>
 
@@ -116,7 +113,9 @@ export function CaptureBar({ userId, onCreate }: Props) {
               className={`min-w-0 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50 ${recording ? 'hidden sm:block' : ''}`}
             />
 
+            {/* Hidden file inputs: one for gallery, one for camera */}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => submitImage(e.target.files?.[0])} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => submitImage(e.target.files?.[0])} />
 
             <button type="button" onClick={submitText} disabled={busy || !text.trim()}
               className={`${recording ? 'hidden sm:flex' : 'flex'} h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition disabled:opacity-30`}

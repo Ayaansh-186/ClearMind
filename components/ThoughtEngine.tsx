@@ -88,7 +88,7 @@ export function ThoughtEngine({ userId, onCreate, onOpenNote }: Props) {
       {/* Floating trigger button — sits left of the chat button */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => textareaRef.current?.focus(), 100) }}
-        className="fixed bottom-[calc(var(--mobile-nav-offset)+1rem)] right-20 z-30 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition hover:scale-105 active:scale-95 md:bottom-6 md:right-20"
+        className="fixed bottom-[calc(var(--mobile-nav-offset)+1rem)] right-[4.75rem] z-30 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition hover:scale-105 active:scale-95 md:bottom-6 md:right-24"
         style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)' }}
         aria-label="Open Thought Engine"
         title="Thought Engine — transform ideas into structure"

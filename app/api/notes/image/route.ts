@@ -9,8 +9,6 @@ async function extractTextFromImage(base64Image: string, mimeType: string): Prom
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
     },
     body: JSON.stringify({
-      // Migrated from meta-llama/llama-4-scout-17b-16e-instruct (deprecated June 2026, decommissioned July 17 2026)
-      // qwen/qwen3.6-27b is the recommended vision replacement — 20MB file limit, 500 t/s, native multimodal
       model: 'qwen/qwen3.6-27b',
       messages: [
         {
@@ -77,7 +75,7 @@ export async function POST(request: Request) {
       console.log('✓ Extracted text:', extractedText.slice(0, 100))
     } catch (err) {
       console.error('Vision extraction failed:', err)
-      extractedText = `📷 Image note — ${file.name}\n\nUploaded on ${new Date().toLocaleDateString()}.`
+      extractedText = `📷 Image captured on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.\n\nAI could not extract text from this image. Open the note to view the image.`
     }
 
     // Save note
@@ -91,6 +89,11 @@ export async function POST(request: Request) {
         cluster: null,
         relevance: 5,
         is_archived: false,
+        is_pinned: false,
+        is_shared: false,
+        is_discover: false,
+        share_id: null,
+        reaction_count: 0,
       })
       .select('*')
       .single()
